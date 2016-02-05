@@ -1,5 +1,8 @@
-require 'bundler'
+require 'bundler/setup'
 Bundler.require
+
+Rack::Utils.key_space_limit = 655360 # x10 Rack default
+Rack::Utils.param_depth_limit = 200 # x2 Rack default
 
 if ENV['COVERAGE_REPORTS'] && ENV["ASPACE_INTEGRATION"] == "true"
   require 'aspace_coverage'
@@ -85,14 +88,31 @@ class ArchivesSpaceService < Sinatra::Base
       if !DB.connected?
         Log.error("***** DATABASE CONNECTION FAILED *****\n" +
                   "\n" +
-                  "ArchivesSpace could not connect to your specified database URL (#{AppConfig[:db_url]}).\n\n" +
+                  "ArchivesSpace could not connect to your specified database URL (#{AppConfig[:db_url_redacted]}).\n\n" +
                   "Please check your configuration and try again.")
         raise "Database connection failed"
       end
 
       require_relative "model/ASModel"
+
+      # let's check that our migrations have passed and we're on the right
+      # schema_info version
+      unless AppConfig[:ignore_schema_info_check] 
+        schema_info = 0
+        DB.open do |db| schema_info =  db[:schema_info].get(:version) end
+        if schema_info != ASConstants.SCHEMA_INFO
+          Log.error("***** DATABASE MIGRATION ERROR *****\n" +
+                    "\n" +
+                    "ArchivesSpace has encountered a problem with your database schema info version.\n\n" +
+                    "The schema info version should be #{ ASConstants.SCHEMA_INFO} for ArchivesSpace version #{ ASConstants.VERSION}.\n " +
+                    "However, your schema info version is set at #{schema_info}\n" + 
+                    "Please ensure your migrations have been run and completed by using the setup-database script.\n\n ")
+          raise "Schema Info Mismatch. Expected #{ ASConstants.SCHEMA_INFO }, received #{ schema_info } for ASPACE version #{ ASConstants.VERSION }. "
+
+        end
+      end 
       
-      if AppConfig[:enable_jasper] 
+      if AppConfig[:enable_jasper] && DB.supports_jasper? 
         require_relative 'model/reports/jasper_report' 
         require_relative 'model/reports/jasper_report_register' 
         JasperReport.compile if AppConfig[:compile_jasper] 

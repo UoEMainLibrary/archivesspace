@@ -3,13 +3,14 @@ ArchivesSpace README
 
 [![Build Status](https://travis-ci.org/archivesspace/archivesspace.svg)](https://travis-ci.org/archivesspace/archivesspace.svg)[![Code Climate](https://codeclimate.com/github/archivesspace/archivesspace.png)](https://codeclimate.com/github/archivesspace/archivesspace)
 
+
 <http://archivesspace.org>
 [Wiki and Issue Tracker](https://archivesspace.atlassian.net)
 IRC: #archivesspace ( chat.freenode.net )
 
 # System requirements
 
-* Java 1.6 or higher; Java 1.7 recommended. Currently,  Java 1.8 requires removal of Jasper libraries from the Java classpath. 
+* Java 1.6 or higher; Java 1.7 or 1.8 recommended.
 * At least 1024 MB RAM allocated to the application
 * A [supported browser](https://github.com/archivesspace/archivesspace/wiki/Supported-browsers)
 
@@ -17,6 +18,10 @@ ArchivesSpace has been tested on Linux (Red Hat and Ubuntu), Mac OS X, and
 Windows (XP, Windows 7, Windows 8, Windows Server 2008 & 2012 ).
 
 MySQL is not required, but is **strongly** recommended for production use.
+
+**The embedded database is for testing purposes only. You should use MySQL for
+any data intended for production, including data in a test instance that you
+intend to move over to a production instance.**
 
 # Getting started
 
@@ -56,11 +61,19 @@ written to the file `logs/archivesspace.out` (by default).
 make sure that there are no spaces in any part of the path name in which the
 ArchivesSpace directory is located.
 
-The first time it starts, the system will take a minute or so to start
-up.  Once it is ready, you should be able to point your browser to
-http://localhost:8080/ and access the ArchivesSpace staff interface.
+## Start ArchivesSpace
 
-To start using the application, log in using the adminstrator account:
+The first time it starts, the system will take a minute or so to start
+up.  Once it is ready, confirm that ArchivesSpace is running correctly by 
+accessing the following URLs in your browser:
+
+  - http://localhost:8089/ -- the backend
+  - http://localhost:8080/ -- the staff interface
+  - http://localhost:8081/ -- the public interface
+  - http://localhost:8090/ -- the Solr admin console
+
+To start using the Staff interface application, log in using the adminstrator 
+account:
 
 * Username: `admin`
 * Password: `admin`
@@ -230,18 +243,8 @@ ArchivesSpace requires.  Run this with:
 
     scripts/setup-database.sh  # or setup-database.bat under Windows
 
-## Start ArchivesSpace
-
-Once your database is configured, start the application using
-`archivesspace.sh` (or `archivesspace.bat` under Windows).
-
-Confirm that ArchivesSpace is running correctly by accessing the
-following URLs in your browser:
-
-  - http://localhost:8089/ -- the backend
-  - http://localhost:8080/ -- the staff interface
-  - http://localhost:8081/ -- the public interface
-  - http://localhost:8090/ -- the Solr admin console
+You can now follow the instructions in the "Getting Started" section to start
+your ArchivesSpace application. 
 
 
 # Backup and recovery
@@ -257,7 +260,6 @@ and the script will generate a file containing:
 
   * A snapshot of the demo database (if you're using the demo
     database)
-
   * A snapshot of the Solr index and related indexer files
 
 If you are running against MySQL and have `mysqldump` installed, you
@@ -276,7 +278,9 @@ recover.
 If you are running MySQL, the `mysqldump` utility can dump the database
 schema and data to a file.  It's a good idea to run this with the
 `--single-transaction` option to avoid locking your database tables
-while your backups run.
+while your backups run. It is also essential to use the `--routines`
+flag, which will include functions and stored procedures in the
+backup (which ArchivesSpace uses at least for Jasper reports).
 
 If you are running with the demo database, you can create periodic
 database snapshots using the following configuration settings:
@@ -307,7 +311,6 @@ When recovering an ArchivesSpace installation from backup, you will
 need to restore:
 
   * Your database (either the demo database or MySQL)
-
   * The search indexes and related indexer files
 
 Of the two, the database backup is the most crucial--search indexes
@@ -355,14 +358,12 @@ ArchivesSpace indexer:
 
   * solr.backup-[timestamp]/snapshot.[timestamp] -- a snapshot of the
     index files.
-
   * solr.backup-[timestamp]/indexer_state -- the files used by the
     indexer to remember what it last indexed.
 
 To restore these directories from backup:
 
   * Copy your index snapshot to `/path/to/archivesspace/data/solr_index/index`
-
   * Copy your indexer_state backup to `/path/to/archivesspace/data/indexer_state`
 
 For example:
@@ -514,9 +515,6 @@ customize ArchivesSpace, please see the README in the `plugins` directory.
 
 [Upgrading to a new release of ArchivesSpace](https://github.com/archivesspace/archivesspace/blob/master/UPGRADING.md)
 
-Version specific considerations:
-
-- [1.1.0](UPGRADING_1.1.0.md)
 
 # Monitoring with New Relic
 

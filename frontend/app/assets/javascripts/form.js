@@ -67,6 +67,28 @@ $(function() {
 
 // add form change detection
 $(function() {
+
+  var lockForm = function() {
+    $(this).each(function() {
+      $(".form-overlay", $(this) ).height('100%').fadeIn();
+      $(this).addClass('locked'); 
+    }); 
+  }
+  
+  var showUnlockForm = function() {
+    $(this).each(function() {
+      
+      var $unlock = $(AS.renderTemplate("form_overlay_unlock_template"));
+      $unlock.on("click", function(event) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        $(window).trigger('hashchange');
+      });
+      $("#archives_form_overlay", $(this) ).append($unlock);
+      $(".alert", $unlock).fadeIn(); 
+    }); 
+  }
+    
   var ignoredKeycodes = [37,39,9];
 
   var initFormChangeDetection = function() {
@@ -76,14 +98,19 @@ $(function() {
       if ($this.data("changedDetectionEnabled")) {
         return;
       }
-
+      
       $this.data("form_changed", $this.data("form_changed") || false);
       $this.data("changedDetectionEnabled", true);
+
+      // this is the overlay we can use to lock the form. 
+      $("> .form-context > .row > .col-md-9", $this).prepend('<div id="archives_form_overlay"><div class="modal-backdrop in form-overlay"></div></div>');
+      $("> .form-context > .row > .col-md-3 .form-actions", $this).prepend('<div id="archives_form_actions_overlay" class="modal-backdrop in form-overlay"></div>');
 
 
       var onFormElementChange = function(event) {
         if ($(event.target).parents("*[data-no-change-tracking='true']").length === 0) {
           $this.trigger("formchanged.aspace");
+          $this.trigger("readonlytree.aspace");
         }
       };
       $this.on("change keyup", ":input", function(event) {
@@ -96,22 +123,20 @@ $(function() {
 
       var submitParentForm = function(e) {
         e.preventDefault();
-        $(this).parents("form.aspace-record-form").submit();
+        var input = $("<input>").attr("type", "hidden").attr("name", "ignorewarnings").val("true");
+        $("form.aspace-record-form").append($(input));
+        $("form.aspace-record-form").submit();
+        return false;
       };
-      $this.on("focusin", ":input", function(event) {
-        $(event.target).parents(".subrecord-form").addClass("focus");
-        $(event.target).bind('keydown', 'ctrl+s', submitParentForm);
-      });
-      $this.on("focusout", ":input", function(event) {
-        $(event.target).parents(".subrecord-form").removeClass("focus");
-        $this.unbind('keydown', submitParentForm);
-      });
-      $this.on("click", ":radio, :checkbox", onFormElementChange);
 
+      $this.on("click", ":radio, :checkbox", onFormElementChange);
 
       $this.on("formchanged.aspace", function(event) {
         if ($this.data("form_changed") === true) {
           event.stopPropagation();
+        } else {
+          $(document).bind('keydown', 'ctrl+s', submitParentForm);
+          $(":input", event.target).bind('keydown', 'ctrl+s', submitParentForm);
         }
         $this.data("form_changed", true);
         $(".record-toolbar", $this).addClass("formchanged");
@@ -126,6 +151,7 @@ $(function() {
         $this.data("form_changed", false);
         $this.data("update-monitor-paused", true);
         $this.off("change keyup formchanged.aspace");
+        $(document).unbind("keydown", submitParentForm);
         $(":input[type='submit'], :input.btn-primary", $this).attr("disabled","disabled");
         if ($(this).data("createPlusOne")) {
           var $input = $("<input>").attr("type", "hidden").attr("name", "plus_one").val("true");
@@ -165,6 +191,15 @@ $(function() {
 
   $(document).bind("loadedrecordform.aspace", function(event, $container) {
     $.proxy(initFormChangeDetection, $("form.aspace-record-form", $container))();
+  });
+ 
+  // we need to lock the form because somethingis happening
+  $(document).bind("lockform.aspace", function(event, $container) {
+    $.proxy(lockForm, [$container] )();   
+  });
+  // and now the thing is done, so we can now allow the user to unlock it. 
+  $(document).bind("unlockform.aspace", function(event, $container) {
+    $.proxy(showUnlockForm, [$container] )();   
   });
 
   $.proxy(initFormChangeDetection, $("form.aspace-record-form"))();

@@ -43,10 +43,10 @@ describe "EAD export mappings" do
                                      :subnotes => [build(:json_note_text, { :publish => true,
                                                            :content => "note_text - The ship set ground on the shore of this uncharted desert isle"} ),
                                                    build(:json_note_text, { :publish => true,
-                                                           :content => "note_text - With:"}),
+                                                           :content => "<p id='whatisthisfoolishness' >note_text - With:</p>"}),
                                                    build(:json_note_definedlist,{  :publish => true, :title => "note_definedlist",
                                                            :items => [
-                                                                      {:label => "First Mate", :value => "Gilligan" },
+                                                                      {:label => "First Mate", :value => "<persname encodinganalog='600$a' source='lcnaf'>Gilligan</persname>" },
                                                                       {:label => "Captain",:value => "The Skipper"},
                                                                       {:label => "Etc.", :value => "The Professor and Mary Ann" }
                                                                      ]
@@ -56,7 +56,7 @@ describe "EAD export mappings" do
 
 
     resource = create(:json_resource,  :linked_agents => build_linked_agents(@agents),
-                      :notes => build_archival_object_notes(100) + [@mixed_subnotes_tracer],
+                      :notes => build_archival_object_notes(10) + [@mixed_subnotes_tracer],
                       :subjects => @subjects.map{|ref, s| {:ref => ref}},
                       :instances => instances,
                       :finding_aid_status => %w(completed in_progress under_revision unprocessed).sample,
@@ -76,8 +76,6 @@ describe "EAD export mappings" do
                  :linked_agents => build_linked_agents(@agents),
                  :instances => [build(:json_instance_digital), build(:json_instance)],
                  :subjects => @subjects.map{|ref, s| {:ref => ref}}.shuffle
-
-
                  )
 
       a = JSONModel(:archival_object).find(a.id)
@@ -402,7 +400,7 @@ describe "EAD export mappings" do
             mt(dl['title'], "#{dl_path}/head")
             dl['items'].each_with_index do |item, j|
               mt(item['label'], "#{dl_path}/defitem[#{j+1}]/label")
-              mt(item['value'], "#{dl_path}/defitem[#{j+1}]/item")
+              mt(item['value'], "#{dl_path}/defitem[#{j+1}]/item",  :markup)
             end
           end
         end
@@ -621,8 +619,8 @@ describe "EAD export mappings" do
       def node_name_for_term_type(type)
         case type
         when 'function'; 'function'
-        when 'genre_form' || 'style_period';  'genreform'
-        when 'geographic'|| 'cultural_context'; 'geogname'
+        when 'genre_form', 'style_period';  'genreform'
+        when 'geographic', 'cultural_context'; 'geogname'
         when 'occupation';  'occupation'
         when 'topical'; 'subject'
         when 'uniform_title'; 'title'
