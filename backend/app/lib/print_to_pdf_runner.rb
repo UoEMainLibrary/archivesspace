@@ -31,8 +31,7 @@ class PrintToPDFRunner < JobRunner
         @job.write_output("Generating PDF for #{resource["title"]}  ")
         
         obj = URIResolver.resolve_references(resource,
-                                                [ "repository", "linked_agents", "subjects", "tree",  "digital_objects"],
-                                                { 'rack.input' => "",  'QUERY_STRING' => "" })
+                                             [ "repository", "linked_agents", "subjects", "tree",  "digital_objects"])
         opts = {
           :include_unpublished => true,
           :include_daos => true,
@@ -49,6 +48,7 @@ class PrintToPDFRunner < JobRunner
         pdf.unlink
         @job.record_modified_uris( [@json.job["source"]] ) 
         @job.write_output("All done. Please click refresh to view your download link.")
+        self.success!
         job_file
       end 
     rescue Exception => e

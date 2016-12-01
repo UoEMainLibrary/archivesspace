@@ -15,25 +15,35 @@ class JobsController < ApplicationController
     @job = JSONModel(:job).new._always_valid!
     @job_types = job_types
     @import_types = import_types
+    @report_data = JSONModel::HTTP::get_json("/reports")
   end
 
   def create
 
     job_data = case params['job']['job_type']
                when 'find_and_replace_job'
-                 params['find_and_replace_job'].reject{|k,v| k === '_resolved'}
+                 params['find_and_replace_job']
                when 'print_to_pdf_job'
-                 params['print_to_pdf_job'].reject{|k,v| k === '_resolved'}
+                 params['print_to_pdf_job']
+               when 'report_job'
+                 params['report_job']
                when 'import_job'
                  params['import_job']
                end
 
+    # Knock out the _resolved parameter because it's often very large.
+    job_data = ASUtils.recursive_reject_key(job_data) { |k| k === '_resolved' }
+    job_params = ASUtils.recursive_reject_key(params['job']['job_params']) { |k| k === '_resolved' }
+
+    job_data["repo_id"] ||= session[:repo_id]
     begin
       job = Job.new(params['job']['job_type'], job_data, Hash[Array(params['files']).reject(&:blank?).map {|file|
-                                  [file.original_filename, file.tempfile]
-                                }])
+                                  [file.original_filename, file.tempfile]}], 
+                                  job_params
+                   )
 
     rescue JSONModel::ValidationException => e
+
       @exceptions = e.invalid_object._exceptions
       @job = e.invalid_object
       @job_types = job_types
@@ -93,8 +103,15 @@ class JobsController < ApplicationController
 
 
   def download_file
+    @job = JSONModel(:job).find(params[:job_id], "resolve[]" => "repository")
+    
+    if @job.job.has_key?("format") && !@job.job["format"].blank? 
+        format = @job.job["format"]
+    else
+        format = "pdf"
+    end 
     url = "/repositories/#{JSONModel::repository}/jobs/#{params[:job_id]}/output_files/#{params[:id]}"
-    stream_file(url, {:filename => "job_#{params[:job_id].to_s}_file_#{params[:id].to_s}" } ) 
+    stream_file(url, {:format => format, :filename => "job_#{params[:job_id].to_s}_file_#{params[:id].to_s}" } ) 
   end
   
   
@@ -110,7 +127,7 @@ class JobsController < ApplicationController
   end
 
   def job_types
-    Job.available_types.map {|e| [I18n.t("enumerations.job_type.#{e}"), e]}
+    Job.available_types.map {|e| [I18n.t("enumerations.job_type.#{e}"), e] unless e.blank?  }.compact
   end
 
   def import_types
@@ -120,12 +137,13 @@ class JobsController < ApplicationController
 
   def stream_file(request_uri, params = {})
 
-    filename = params[:filename] ? "#{params.delete(:filename)}.pdf" : "ead.pdf"
-    # we need to make this more generic to support other file types
-    # right now the use case is for PDFs.
+    filename = params[:filename] ? "#{params[:filename]}.#{params[:format]}" : "ead.pdf"
+
+
+
     respond_to do |format|
       format.html {
-        self.response.headers["Content-Type"] ||= 'application/pdf' 
+        self.response.headers["Content-Type"] ||= "application/#{params[:format]}" 
         self.response.headers["Content-Disposition"] = "attachment; filename=#{filename}"
         self.response.headers['Last-Modified'] = Time.now.ctime.to_s
 

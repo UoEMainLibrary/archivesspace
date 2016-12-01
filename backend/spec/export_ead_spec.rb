@@ -39,24 +39,37 @@ describe "EAD export mappings" do
     @mixed_subnotes_tracer = build("json_note_multipart", {
                                      :type => 'bioghist',
                                      :publish => true,
-                                     :persistent_id => "mixed_subnotes_tracter",
+                                     :persistent_id => "mixed_subnotes_tracer",
                                      :subnotes => [build(:json_note_text, { :publish => true,
                                                            :content => "note_text - The ship set ground on the shore of this uncharted desert isle"} ),
                                                    build(:json_note_text, { :publish => true,
-                                                           :content => "note_text - With:"}),
+                                                           :content => "<p id='whatisthisfoolishness' >note_text - With:</p>"}),
                                                    build(:json_note_definedlist,{  :publish => true, :title => "note_definedlist",
                                                            :items => [
-                                                                      {:label => "First Mate", :value => "Gilligan" },
+                                                                      {:label => "First Mate", :value => "<persname encodinganalog='600$a' source='lcnaf'>Gilligan</persname>" },
                                                                       {:label => "Captain",:value => "The Skipper"},
                                                                       {:label => "Etc.", :value => "The Professor and Mary Ann" }
                                                                      ]
                                                          }),
-                                                   build(:json_note_text,{   :content => "note_text - Here on Gillgian's Island", :publish => true}) ]
+                                                   build(:json_note_text,{   :content => "note_text - Here on Gillgian's Island", :publish => true}) ,
+                                                  ]
                                    })
+
+    @another_note_tracer = build("json_note_multipart", {
+                              :type => 'bioghist',
+                              :publish => true,
+                              :persistent_id => "another_note_tracer",
+                              :subnotes => [
+                                            build(:json_note_chronology, {
+                                                    :title => "my life story",
+                                                    :items => [{'event_date' => "1900", 'events' => ["LIFE &amp; DEATH"]}]
+                                                  }),
+                                           ]
+                            })
 
 
     resource = create(:json_resource,  :linked_agents => build_linked_agents(@agents),
-                      :notes => build_archival_object_notes(100) + [@mixed_subnotes_tracer],
+                      :notes => build_archival_object_notes(10) + [@mixed_subnotes_tracer, @another_note_tracer],
                       :subjects => @subjects.map{|ref, s| {:ref => ref}},
                       :instances => instances,
                       :finding_aid_status => %w(completed in_progress under_revision unprocessed).sample,
@@ -76,8 +89,6 @@ describe "EAD export mappings" do
                  :linked_agents => build_linked_agents(@agents),
                  :instances => [build(:json_instance_digital), build(:json_instance)],
                  :subjects => @subjects.map{|ref, s| {:ref => ref}}.shuffle
-
-
                  )
 
       a = JSONModel(:archival_object).find(a.id)
@@ -150,7 +161,6 @@ describe "EAD export mappings" do
     # let's makes sure there's one agent a creator without and terms.
     agents.find { |a| a[:role] == "creator" }[:terms] = []
     agents.shuffle
-
   end
 
 
@@ -251,6 +261,7 @@ describe "EAD export mappings" do
 
           mt(head_text, "#{path}/head")
           regcontent = content.split(/\n\n|\r/).map { |c| ".*?[\r\n\n]*.*?#{c.strip}" }
+          next if regcontent.empty?
           mt(/^.*?#{head_text}.*?[\r\n\n]*.*?#{regcontent}.*?$/m, "#{path}")
         end
       end
@@ -360,7 +371,8 @@ describe "EAD export mappings" do
               next unless item.has_key?('events')
               item['events'].each_with_index do |event, k|
                 event_path = "#{item_path}/eventgrp/event[#{k+1}]"
-                mt(event, event_path)
+                # Nokogiri 'helpfully' reads "&amp;" into "&" when it parses the doc
+                mt(event.gsub("&amp;", "&"), event_path)
               end
             end
           end
@@ -402,13 +414,13 @@ describe "EAD export mappings" do
             mt(dl['title'], "#{dl_path}/head")
             dl['items'].each_with_index do |item, j|
               mt(item['label'], "#{dl_path}/defitem[#{j+1}]/label")
-              mt(item['value'], "#{dl_path}/defitem[#{j+1}]/item")
+              mt(item['value'], "#{dl_path}/defitem[#{j+1}]/item",  :markup)
             end
           end
         end
       end
 
-      it "ensures subnotes[] order is respects, even if subnotes are of mixed types" do
+      it "ensures subnotes[] order is respected, even if subnotes are of mixed types" do
 
         path = "//bioghist[@id = 'aspace_#{@mixed_subnotes_tracer['persistent_id']}']"
         head_text = translate('enumerations._note_types',@mixed_subnotes_tracer['type'])
@@ -420,6 +432,14 @@ describe "EAD export mappings" do
           i = i + 1
         end
 
+      end
+
+
+      it "doesn't double-escape '&amp;' in a chronitem event on export" do
+        path = "//bioghist[@id = 'aspace_#{@another_note_tracer['persistent_id']}']/chronlist/chronitem/eventgrp/event"
+
+        # we are really testing that the raw XML doesn't container '&amp;amp;'
+        mt("LIFE & DEATH", path)
       end
     end
 
@@ -457,7 +477,7 @@ describe "EAD export mappings" do
       end
 
 
-      it "maps {archival_object}.instance[].instance_type to {desc_path}/did/container@label" do
+      it "maps {archival_object}.instance[].instance_type and {archival_object}.instance[].container.barcode_1 to {desc_path}/did/container@label" do
         instances.each do |inst|
           cont = inst['container']
           (1..3).each do |i|
@@ -466,10 +486,14 @@ describe "EAD export mappings" do
             next unless i == 1
             data = cont["indicator_#{i}"]
             mt(data, "#{desc_path}/did/container[#{@count}]")
-            data = translate('enumerations.instance_instance_type', inst['instance_type'])
+            data = "#{translate('enumerations.instance_instance_type', inst['instance_type'])} (#{cont['barcode_1']})"
             mt(data, "#{desc_path}/did/container[#{@count}]", "label")
           end
         end
+      end
+
+      it "maps {archival_object}.instances[].container.barcode_1 to {desc_path}/did/container@label" do
+
       end
     end
 
@@ -621,8 +645,8 @@ describe "EAD export mappings" do
       def node_name_for_term_type(type)
         case type
         when 'function'; 'function'
-        when 'genre_form' || 'style_period';  'genreform'
-        when 'geographic'|| 'cultural_context'; 'geogname'
+        when 'genre_form', 'style_period';  'genreform'
+        when 'geographic', 'cultural_context'; 'geogname'
         when 'occupation';  'occupation'
         when 'topical'; 'subject'
         when 'uniform_title'; 'title'
@@ -633,14 +657,27 @@ describe "EAD export mappings" do
       it "maps linked agents with role 'subject' or 'source' to {desc_path}/controlaccess/NODE" do
         object.linked_agents.each do |link|
           link_role = link[:role] || link['role']
+          ref = link[:ref] || link['ref']
+          agent = @agents[ref]
+          node_name = case agent.agent_type
+                      when 'agent_person'; 'persname'
+                      when 'agent_family'; 'famname'
+                      when 'agent_corporate_entity'; 'corpname'
+                      end
+
+          # https://archivesspace.atlassian.net/browse/AR-985?focusedCommentId=17531&page=com.atlassian.jira.plugin.system.issuetabpanels:comment-tabpanel#comment-17531
+          if link_role == 'creator'
+            path = "#{desc_path}/controlaccess/#{node_name}[contains(text(), '#{agent.names[0]['sort_name']}')]"
+            doc.should_not have_node(path)
+          end
+
           next unless %w(source subject).include?(link_role)
           relator = link[:relator] || link['relator']
-          ref = link[:ref] || link['ref']
           role = relator ? relator : (link_role == 'source' ? 'fmo' : nil)
-          agent = @agents[ref]
           sort_name = agent.names[0]['sort_name']
           rules = agent.names[0]['rules']
           source = agent.names[0]['source']
+          authfilenumber = agent.names[0]['authority_id']
           content = "#{sort_name}"
 
           terms = link[:terms] || link['terms']
@@ -650,17 +687,12 @@ describe "EAD export mappings" do
             content << terms.map{|t| t['term']}.join(' -- ')
           end
 
-          node_name = case agent.agent_type
-                      when 'agent_person'; 'persname'
-                      when 'agent_family'; 'famname'
-                      when 'agent_corporate_entity'; 'corpname'
-                      end
-
           path = "#{desc_path}/controlaccess/#{node_name}[contains(text(), '#{sort_name}')]"
 
           mt(rules, path, 'rules')
           mt(source, path, 'source')
           mt(role, path, 'label')
+          mt(authfilenumber, path, 'authfilenumber')
           mt(content.strip, path)
         end
       end
@@ -678,6 +710,7 @@ describe "EAD export mappings" do
 
           mt(term_string, path)
           mt(subject.source, path, 'source')
+          mt(subject.authority_id, path, 'authfilenumber')
         end
       end
     end
@@ -981,6 +1014,44 @@ describe "EAD export mappings" do
       end
     end
   end
+
+  describe "Testing EAD Serializer mixed content behavior" do
+
+    let(:note_with_p) { "<p>A NOTE!</p>" }
+    let(:note_with_linebreaks) { "Something, something,\n\nsomething." }
+    let(:note_with_linebreaks_and_good_mixed_content) { "Something, something,\n\n<bioghist>something.</bioghist>\n\n" }
+    let(:note_with_linebreaks_and_evil_mixed_content) { "Something, something,\n\n<bioghist>something.\n\n</bioghist>\n\n" }
+    let(:note_with_linebreaks_but_something_xml_nazis_hate) { "Something, something,\n\n<prefercite>XML & How to Live it!</prefercite>\n\n" }
+    let(:note_with_linebreaks_and_xml_namespaces) { "Something, something,\n\n<prefercite xlink:foo='one' ns2:bar='two' >XML, you so crazy!</prefercite>\n\n" }
+    let(:serializer) { EADSerializer.new }
+
+    it "can strip <p> tags from content when disallowed" do
+      serializer.strip_p(note_with_p).should eq("A NOTE!")
+    end
+
+    it "can leave <p> tags in content" do
+      serializer.handle_linebreaks(note_with_p).should eq(note_with_p)
+    end
+
+    it "will add <p> tags to content with linebreaks" do
+      serializer.handle_linebreaks(note_with_linebreaks).should eq("<p>Something, something,</p><p>something.</p>")
+    end
+
+    it "will add <p> tags to content with linebreaks and mixed content" do
+      serializer.handle_linebreaks(note_with_linebreaks_and_good_mixed_content).should eq("<p>Something, something,</p><p><bioghist>something.</bioghist></p>")
+    end
+
+    it "will return original content when linebreaks and mixed content produce invalid markup" do
+      serializer.handle_linebreaks(note_with_linebreaks_and_evil_mixed_content).should eq(note_with_linebreaks_and_evil_mixed_content)
+    end
+    
+    it "will add <p> tags to content with linebreaks and mixed content even if those evil &'s are present in the text" do
+      serializer.handle_linebreaks(note_with_linebreaks_but_something_xml_nazis_hate).should eq("<p>Something, something,</p><p><prefercite>XML &amp; How to Live it!</prefercite></p>")
+    end
+    
+    it "will add <p> tags to content with linebreaks and mixed content even there are weird namespace prefixes" do
+      serializer.handle_linebreaks(note_with_linebreaks_and_xml_namespaces).should eq("<p>Something, something,</p><p><prefercite xlink:foo='one' ns2:bar='two' >XML, you so crazy!</prefercite></p>")
+    end
+
+  end
 end
-
-
