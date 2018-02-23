@@ -39,6 +39,36 @@
             "type" => "object",
             "readonly" => "true"
           }
+        },
+        "ifmissing" => "error"
+      },
+      
+      "ancestors" => {
+        "type" => "array",
+        "items" => {
+          "type" => "object",
+          "subtype" => "ref",
+          "properties" => {
+            "ref" => {"type" => [{"type" => "JSONModel(:resource) uri"},
+                                 {"type" => "JSONModel(:archival_object) uri"}]},
+            "level" => {"type" => "string", "maxLength" => 255},
+            "_resolved" => {
+              "type" => "object",
+              "readonly" => "true"
+            }
+          }
+        }
+      },
+
+      "series" => {
+        "type" => "object",
+        "subtype" => "ref",
+        "properties" => {
+          "ref" => {"type" => "JSONModel(:archival_object) uri"},
+          "_resolved" => {
+            "type" => "object",
+            "readonly" => "true"
+          }
         }
       },
 
@@ -55,6 +85,12 @@
       },
 
       "has_unpublished_ancestor" => {"type" => "boolean", "readonly" => "true"},
+
+      "representative_image" => {
+        "type" => "JSONModel(:file_version) object",
+        "readonly" => true
+      }
+
     },
   },
 }

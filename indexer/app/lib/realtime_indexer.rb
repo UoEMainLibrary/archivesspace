@@ -1,7 +1,7 @@
 require_relative 'indexer_common'
 require 'net/http'
 
-class RealtimeIndexer < CommonIndexer
+class RealtimeIndexer < IndexerCommon
 
   def initialize(backend_url, should_continue)
     super(backend_url)
@@ -12,7 +12,7 @@ class RealtimeIndexer < CommonIndexer
 
   def get_updates(last_sequence = 0)
 
-    resolve_params = @@resolved_attributes.map {|a| "resolve[]=#{a}"}.join("&")
+    resolve_params = resolved_attributes.map {|a| "resolve[]=#{a}"}.join("&")
 
     response = do_http_request(URI.parse(@backend_url),
                                Net::HTTP::Get.new("/update-feed?last_sequence=#{last_sequence}&#{resolve_params}"))
@@ -49,10 +49,10 @@ class RealtimeIndexer < CommonIndexer
       end
     rescue Timeout::Error
       # Doesn't matter...
-                       rescue
+    rescue
       reset_session
-      puts "#{$!.inspect}"
-      puts $@.join("\n")
+      Log.error("#{$!.inspect}")
+      Log.error($@.join("\n"))
       sleep 5
     end
 

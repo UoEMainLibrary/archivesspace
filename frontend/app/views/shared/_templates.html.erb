@@ -222,3 +222,37 @@
     <span class="collapse"><%= I18n.t("note._frontend.action.collapse")%></span>
   </button>
 --></div>
+
+<div id="too_many_subrecords_template"><!--
+    <div class="alert alert-info alert-too-many">
+      <%= I18n.t ("actions.click_to_show") %>
+    </div>
+--></div>
+
+<div id="form_overlay_unlock_template"><!--
+  <div class="unlock-notice"> 
+    <div class="alert alert-info">
+      <%= I18n.t ("actions.click_to_show") %>
+    </div>
+  </div>
+--></div>
+
+<div id="template_note_summary"><!--
+  <div class="subrecord-summary-title">
+    {if type != ""}
+    ${type}
+    {/if}
+    {if label != "" && label != type}
+    {if type != ""} - {/if}
+    ${label}
+    {/if}
+    {if label == "" && type == ""}
+    ${jsonmodel_type}
+    {/if}
+  </div>
+  {if summary.length > 0}
+  <div class="subrecord-summary-content">
+    ${summary}
+  </div>
+  {/if}
+--></div>

@@ -1,6 +1,6 @@
 ArchivesSpace::Application.routes.draw do
 
-  scope AppConfig[:frontend_prefix] do
+  scope AppConfig[:frontend_proxy_prefix] do
     match 'jobs/:id/cancel' => 'jobs#cancel', :via => [:post]
     match 'jobs/:id/log' => 'jobs#log', :via => [:get]
     match 'jobs/:id/status' => 'jobs#status', :via => [:get]
@@ -23,6 +23,7 @@ ArchivesSpace::Application.routes.draw do
     match 'repositories/:id' => 'repositories#update', :via => [:post]
     match 'repositories/:id/delete' => 'repositories#delete', :via => [:post]
     match 'repositories/delete_records' => 'repositories#delete_records', :via => [:post]
+    match('repositories/search/typeahead' => 'repositories#typeahead', :via => [:get])
 
     match 'users/manage_access' => 'users#manage_access', :via => [:get]
     match 'users/:id/edit_groups' => 'users#edit_groups', :via => [:get]
@@ -79,6 +80,11 @@ ArchivesSpace::Application.routes.draw do
     match 'digital_objects/:id/suppress' => 'digital_objects#suppress', :via => [:post]
     match 'digital_objects/:id/unsuppress' => 'digital_objects#unsuppress', :via => [:post]
 
+    match 'digital_objects/:id/tree/root' => 'digital_objects#tree_root', :via => [:get]
+    match 'digital_objects/:id/tree/node' => 'digital_objects#tree_node', :via => [:get]
+    match 'digital_objects/:id/tree/node_from_root' => 'digital_objects#node_from_root', :via => [:get]
+    match 'digital_objects/:id/tree/waypoint' => 'digital_objects#tree_waypoint', :via => [:get]
+
     match 'digital_object_components/validate_rows' => 'digital_object_components#validate_rows', :via => [:post]
     match 'digital_object_components/defaults' => 'digital_object_components#defaults', :via => [:get]
     match 'digital_object_components/defaults' => 'digital_object_components#update_defaults', :via => [:post]
@@ -106,7 +112,12 @@ ArchivesSpace::Application.routes.draw do
     match 'resources/:id/accept_children' => 'resources#accept_children', :via => [:post]
     match 'resources/:id/merge' => 'resources#merge', :via => [:post]
     match 'resources/:id/transfer' => 'resources#transfer', :via => [:post]
-    match 'resources/:id/tree' => 'resources#tree', :via => [:get]
+
+    match 'resources/:id/tree/root' => 'resources#tree_root', :via => [:get]
+    match 'resources/:id/tree/node' => 'resources#tree_node', :via => [:get]
+    match 'resources/:id/tree/node_from_root' => 'resources#node_from_root', :via => [:get]
+    match 'resources/:id/tree/waypoint' => 'resources#tree_waypoint', :via => [:get]
+
     match 'resources/:id/suppress' => 'resources#suppress', :via => [:post]
     match 'resources/:id/unsuppress' => 'resources#unsuppress', :via => [:post]
     match 'resources/:id/models_in_graph' => 'resources#models_in_graph', :via => [:get]
@@ -118,6 +129,11 @@ ArchivesSpace::Application.routes.draw do
     match 'classifications/:id/delete' => 'classifications#delete', :via => [:post]
     match 'classifications/:id/accept_children' => 'classifications#accept_children', :via => [:post]
     match 'classifications/:id/tree' => 'classifications#tree', :via => [:get]
+
+    match 'classifications/:id/tree/root' => 'classifications#tree_root', :via => [:get]
+    match 'classifications/:id/tree/node' => 'classifications#tree_node', :via => [:get]
+    match 'classifications/:id/tree/node_from_root' => 'classifications#node_from_root', :via => [:get]
+    match 'classifications/:id/tree/waypoint' => 'classifications#tree_waypoint', :via => [:get]
 
     match 'classification_terms/defaults' => 'classification_terms#defaults', :via => [:get]
     match 'classification_terms/defaults' => 'classification_terms#update_defaults', :via => [:post]
@@ -141,6 +157,7 @@ ArchivesSpace::Application.routes.draw do
 
     match 'locations/defaults' => 'locations#defaults', :via => [:get]
     match 'locations/defaults' => 'locations#update_defaults', :via => [:post]
+    match 'locations/search' => 'locations#search', :via => [:get]
     resources :locations
     match 'locations/:id' => 'locations#update', :via => [:post]
     match 'locations/:id/delete' => 'locations#delete', :via => [:post]
@@ -157,6 +174,8 @@ ArchivesSpace::Application.routes.draw do
     match 'agents/:agent_type/new' => 'agents#new', :via => [:get]
     match 'agents/:agent_type/defaults' => 'agents#defaults', :via => [:get]
     match 'agents/:agent_type/defaults' => 'agents#update_defaults', :via => [:post]
+    match 'agents/:agent_type/required' => 'agents#required', :via => [:get]
+    match 'agents/:agent_type/required' => 'agents#update_required', :via => [:post]
     match 'agents/:agent_type/:id/edit' => 'agents#edit', :via => [:get]
     match 'agents/:agent_type/:id/update' => 'agents#update', :via => [:post]
     match 'agents/:agent_type/:id/download_eac' => 'exports#download_eac', :via => [:get]
@@ -178,12 +197,12 @@ ArchivesSpace::Application.routes.draw do
 
     match 'enumerations/list' => 'enumerations#list', :via => [:get]
     match 'enumerations/delete' => 'enumerations#delete', :via => [:get]
-    match 'enumerations/set_default/:id' => 'enumerations#set_default', :via => [:post] 
+    match 'enumerations/set_default/:id' => 'enumerations#set_default', :via => [:post]
     match 'enumerations/destroy/:id' => 'enumerations#destroy', :via => [:post]
     match 'enumerations/merge/:id' => 'enumerations#merge', :via => [:post]
     resources :enumerations
-    
-    match 'enumerations/:id/enumeration_value/:enumeration_value_id' => 'enumerations#update_value', :via => [:post] 
+
+    match 'enumerations/:id/enumeration_value/:enumeration_value_id' => 'enumerations#update_value', :via => [:post]
 
 
 
@@ -197,18 +216,59 @@ ArchivesSpace::Application.routes.draw do
     match 'batch_delete/agents' => 'batch_delete#agents', :via => [:post]
     match 'batch_delete/classifications' => 'batch_delete#classifications', :via => [:post]
     match 'batch_delete/locations' => 'batch_delete#locations', :via => [:post]
+    match 'batch_delete/assessments' => 'batch_delete#assessments', :via => [:post]
 
     match 'generate_sequence' => 'utils#generate_sequence', :via => [:get]
 
     match 'schema/:resource_type/properties' => 'utils#list_properties', :via => [:get]
 
     match 'shortcuts' => 'utils#shortcuts', :via => [:get]
+    match 'notes/note_order' => 'utils#note_order', :via =>[:get]
 
     resources :preferences
     match 'preferences/:id' => 'preferences#update', :via => [:post]
 
     resources :rde_templates
     match 'rde_templates/batch_delete' => 'rde_templates#batch_delete', :via => [:post]
+
+    resources :container_profiles
+    match('container_profiles/search/typeahead' => 'container_profiles#typeahead', :via => [:get])
+    match('container_profiles/bulk_operations/update_barcodes' => 'top_containers#update_barcodes', :via => [:post])
+    match('container_profiles/bulk_operations/update_locations' => 'top_containers#update_locations', :via => [:post])
+
+    match('container_profiles/:id' => 'container_profiles#update', :via => [:post])
+    match('container_profiles/:id/delete' => 'container_profiles#delete', :via => [:post])
+
+    resources :top_containers
+    match('top_containers/search/typeahead' => 'top_containers#typeahead', :via => [:get])
+    match('top_containers/bulk_operations/search' => 'top_containers#bulk_operations', :via => [:get])
+    match('top_containers/bulk_operations/search' => 'top_containers#bulk_operation_search', :via => [:post])
+    match('top_containers/bulk_operations/browse' => 'top_containers#bulk_operations_browse', :via => [:get, :post])
+    match('top_containers/bulk_operations/update' => 'top_containers#bulk_operation_update', :via => [:post])
+    match('top_containers/batch_delete' => 'top_containers#batch_delete', :via => [:post])
+    match('top_containers/:id' => 'top_containers#update', :via => [:post])
+    match('top_containers/:id/delete' => 'top_containers#delete', :via => [:post])
+
+    match('extent_calculator' => 'extent_calculator#report', :via => [:get])
+    match('date_calculator/calculate' => 'date_calculator#calculate', :via => [:post])
+    match('date_calculator/create_date' => 'date_calculator#create_date', :via => [:post])
+
+    resources :location_profiles
+    match('location_profiles/search/typeahead' => 'location_profiles#typeahead', :via => [:get])
+    match('location_profiles/:id' => 'location_profiles#update', :via => [:post])
+    match('location_profiles/:id/delete' => 'location_profiles#delete', :via => [:post])
+
+    match('space_calculator' => 'space_calculator#show', :via => [:get])
+    match('space_calculator' => 'space_calculator#calculate', :via => [:post])
+
+
+    match 'assessments/embedded_search' => 'assessments#embedded_search', :via => [:get]
+    resources :assessments
+    match 'assessments/:id' => 'assessments#update', :via => [:post]
+    match 'assessments/:id/delete' => 'assessments#delete', :via => [:post]
+    match 'assessment_attributes' => 'assessment_attributes#edit', :via => [:get]
+    match 'assessment_attributes' => 'assessment_attributes#update', :via => [:post]
+
 
 
     if Plugins.system_menu_items?
@@ -231,10 +291,9 @@ ArchivesSpace::Application.routes.draw do
     end
 
     match "system_info" => "system_info#show", :via => [ :get ]
-    match "system_info/log" => "system_info#stream_log", :via => [:get]     
-    
+    match "system_info/log" => "system_info#stream_log", :via => [:get]
+
     root :to => 'welcome#index'
 
   end
-
 end

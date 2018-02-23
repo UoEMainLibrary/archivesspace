@@ -167,6 +167,14 @@ class ArchivesSpaceService
                       "The ability to cancel a queued or running importer job",
                       :level => "repository")
 
+    Permission.define("create_job",
+                      "The ability to create background jobs",
+                      :level => "repository")
+
+    Permission.define("cancel_job",
+                      "The ability to cancel background jobs",
+                      :level => "repository")
+
 
     # Updates and deletes to locations, subjects and agents are a bit funny: they're
     # global objects, but users are granted permission to modify them by being
@@ -245,6 +253,43 @@ class ArchivesSpaceService
                       "The ability to create and delete RDE templates",
                       :level => "repository")
 
+    Permission.define("update_container_record",
+                  "The ability to create and update container records",
+                  :level => "repository")
+
+    Permission.define("manage_container_record",
+                  "The ability to delete and bulk update container records",
+                  :level => "repository")
+
+    Permission.define("manage_container_profile_record",
+                  "The ability to create, modify and delete a container profile record",
+                  :level => "repository")
+
+    Permission.define("update_container_profile_record",
+                  "The ability to create/update/delete container profile records",
+                  :implied_by => 'manage_container_profile_record',
+                  :level => "global")
+
+    Permission.define("manage_location_profile_record",
+                      "The ability to create, modify and delete a location profile record",
+                      :level => "repository")
+
+    Permission.define("update_location_profile_record",
+                      "The ability to create/update/delete location profile records",
+                      :implied_by => 'manage_location_profile_record',
+                      :level => "global")
+
+    Permission.define("update_assessment_record",
+                      "The ability to create and modify assessment records",
+                      :level => "repository")
+
+    Permission.define("delete_assessment_record",
+                      "The ability to delete assessment records",
+                      :level => "repository")
+
+    Permission.define("manage_assessment_attributes",
+                      "The ability to managae assessment attribute definitions",
+                      :level => "repository")
   end
 
 

@@ -6,8 +6,6 @@ module SearchHelper
     search_params["filter_term"] = Array(opts["filter_term"] || params["filter_term"]).clone
     search_params["filter_term"].concat(Array(opts["add_filter_term"])) if opts["add_filter_term"]
     search_params["filter_term"] = search_params["filter_term"].reject{|f| Array(opts["remove_filter_term"]).include?(f)} if opts["remove_filter_term"]
-    
-    search_params["simple_filters"] = Array(opts["simple_filters"] || params["simple_filters"]).clone
 
     if params["multiplicity"]
       search_params["multiplicity"] = params["multiplicity"] 
@@ -49,7 +47,7 @@ module SearchHelper
     if params["advanced"]
       search_params["advanced"] = params["advanced"]
       params.keys.each do |param_key|
-        ["op", "f", "v", "dop", "t"].each do |adv_search_prefix|
+        ["op", "f", "v", "dop", "t", "top"].each do |adv_search_prefix|
           if param_key =~ /^#{adv_search_prefix}\d+/
             search_params[param_key] = params[param_key]
           end
@@ -105,6 +103,7 @@ module SearchHelper
 
 
   def can_edit_search_result?(record)
+    return user_can?('update_container_record', record['id']) if record['primary_type'] === "top_container"
     return user_can?('manage_repository', record['id']) if record['primary_type'] === "repository"
     return user_can?('update_location_record') if record['primary_type'] === "location"
     return user_can?('update_subject_record') if record['primary_type'] === "subject"
@@ -114,6 +113,7 @@ module SearchHelper
     return user_can?('update_accession_record') if record['primary_type'] === "accession"
     return user_can?('update_resource_record') if ["resource", "archival_object"].include?(record['primary_type'])
     return user_can?('update_digital_object_record') if ["digital_object", "digital_object_component"].include?(record['primary_type'])
+    return user_can?('update_assessment_record') if record['primary_type'] === "assessment"
   end
 
 

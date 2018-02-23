@@ -1,6 +1,7 @@
 <% define_template "rde_archival_object_sections" do |form| %>
   <th data-id="basic" class="section-basic" colspan="6"><%= I18n.t("rde.sections.basic_information") %></th>
   <th data-id="date" class="section-date" colspan="5" class="conditionally-required"><%= I18n.t("rde.sections.date") %></th>
+  <th data-id="extent" class="section-extent" colspan="6" class="conditionally-required"><%= I18n.t("rde.sections.extent") %></th>
   <th data-id="instance" class="section-instance" colspan="8"><%= I18n.t("rde.sections.instance") %></th>
   <th data-id="note" class="section-note" colspan="9"><%= I18n.t("rde.sections.notes") %></th>
 <% end %>
@@ -12,19 +13,26 @@
   <th id="colTitle" class="fieldset-label conditionally-required" data-section="basic"><%= I18n.t("archival_object.title") %></th>
   <th id="colCompId" class="fieldset-label" data-section="basic"><%= I18n.t("archival_object.component_id") %></th>
   <th id="colLang" class="fieldset-label sticky" data-section="basic"><%= I18n.t("archival_object.language") %></th>
+
   <th id="colExpr" class="fieldset-label sticky" data-section="date"><%= I18n.t("date.expression") %></th>
   <th id="colDType" class="fieldset-label sticky" data-section="date"><%= I18n.t("rde.date_type") %></th>
   <th id="colDLabel" class="fieldset-label sticky" data-section="date"><%= I18n.t("date.label") %></th>
   <th id="colDBegin" class="fieldset-label sticky" data-section="date"><%= I18n.t("date.begin") %></th>
   <th id="colDEnd" class="fieldset-label sticky" data-section="date"><%= I18n.t("date.end") %></th>
+
+  <th id="colEPortion" class="fieldset-label sticky" data-section="extent"><%= I18n.t("extent.portion") %></th>
+  <th id="colENumber" class="fieldset-label sticky" data-section="extent"><%= I18n.t("extent.number") %></th>
+  <th id="colEType" class="fieldset-label sticky" data-section="extent"><%= I18n.t("extent.extent_type") %></th>
+  <th id="colEContainer" class="fieldset-label sticky" data-section="extent"><%= I18n.t("extent.container_summary") %></th>
+  <th id="colEPhysical" class="fieldset-label sticky" data-section="extent"><%= I18n.t("extent.physical_details") %></th>
+  <th id="colEDimensions" class="fieldset-label sticky" data-section="extent"><%= I18n.t("extent.dimensions") %></th>
+
   <th id="colIType" class="fieldset-label sticky" data-section="instance"><%= I18n.t("rde.instance_type") %></th>
-  <th id="colCType1" class="fieldset-label sticky" data-section="instance"><%= I18n.t("container.type_1") %></th>
-  <th id="colCInd1" class="fieldset-label sticky" data-section="instance"><%= I18n.t("container.indicator_1") %></th>
-  <th id="colCBarc1" class="fieldset-label sticky" data-section="instance"><%= I18n.t("container.barcode_1") %></th>
-  <th id="colCType2" class="fieldset-label" data-section="instance"><%= I18n.t("container.type_2") %></th>
-  <th id="colCInd2" class="fieldset-label" data-section="instance"><%= I18n.t("container.indicator_2") %></th>
-  <th id="colCType3" class="fieldset-label" data-section="instance"><%= I18n.t("container.type_3") %></th>
-  <th id="colCInd3" class="fieldset-label" data-section="instance"><%= I18n.t("container.indicator_3") %></th>
+  <th id="colCTop" class="fieldset-label sticky" data-section="instance"><%= I18n.t("top_container._singular") %></th>
+  <th id="colCType2" class="fieldset-label" data-section="instance"><%= I18n.t("sub_container.type_2") %></th>
+  <th id="colCInd2" class="fieldset-label" data-section="instance"><%= I18n.t("sub_container.indicator_2") %></th>
+  <th id="colCType3" class="fieldset-label" data-section="instance"><%= I18n.t("sub_container.type_3") %></th>
+  <th id="colCInd3" class="fieldset-label" data-section="instance"><%= I18n.t("sub_container.indicator_3") %></th>
   <th id="colNType1" class="fieldset-label" data-section="note"><%= I18n.t("note._singular") %> 1</th>
   <th id="colNLabel1" class="fieldset-label" data-section="note"><%= I18n.t("note_attributes.label") %> 1</th>
   <th id="colNCont1" class="fieldset-label" data-section="note"><%= I18n.t("note_attributes.content") %> 1</th>
@@ -38,7 +46,14 @@
 
 <% define_template "rde_archival_object_cols" do |form| %>
   <col class="fieldset-col" data-default-width='150' />
+  <col class="fieldset-col" data-default-width='150' />
   <col class="fieldset-col" data-default-width='70' />
+  <col class="fieldset-col" data-default-width='150' />
+  <col class="fieldset-col" data-default-width='150' />
+  <col class="fieldset-col" data-default-width='150' />
+  <col class="fieldset-col" data-default-width='150' />
+  <col class="fieldset-col" data-default-width='150' />
+  <col class="fieldset-col" data-default-width='150' />
   <col class="fieldset-col" data-default-width='150' />
   <col class="fieldset-col" data-default-width='150' />
   <col class="fieldset-col" data-default-width='150' />
@@ -80,6 +95,8 @@
         </div>
         <div class="error-summary-list"></div>
       </div>
+
+      <%= form.hidden_input "resource[ref]", @resource_uri %>
     </td>
     <td data-col="colLevel" class="form-group"><%= form.select "level", form.possible_options_for("level", true) %></td>
     <td data-col="colOtherLevel" class="form-group"><%= form.textfield "other_level" %></td>
@@ -96,7 +113,7 @@
     </td>
     <td data-col="colDType" class="form-group">
       <% form.push(form.set_index("dates[]", 0), begin archival_object["dates"][0] || {} rescue {} end) do %>
-        <%= form.select "date_type", jsonmodel_definition(:date).options_for(form, "date_type", true) %>
+        <%= form.select "date_type", jsonmodel_definition(:date).options_for(form, "date_type", true, {:exclude => ['range']}) %>
       <% end %>
       <% form.push("dates", begin archival_object["dates"] || [] rescue [] end) do %>
         <span id="<%= form.id_for(nil) %>"></span>
@@ -117,59 +134,80 @@
         <%= form.textfield "end" %>
       <% end %>
     </td>
+    <td data-col="colEPortion" class="form-group">
+      <% form.push(form.set_index("extents[]", 0), begin archival_object["extents"][0] || {} rescue {} end) do %>
+        <%= form.select "portion", jsonmodel_definition(:extent).options_for(form, "portion", true) %>
+      <% end %>
+      <% form.push("extents", begin archival_object["extents"] || [] rescue [] end) do %>
+        <span id="<%= form.id_for(nil) %>"></span>
+      <% end %>
+    </td>
+    <td data-col="colENumber" class="form-group">
+      <% form.push(form.set_index("extents[]", 0), begin archival_object["extents"][0] || {} rescue {} end) do %>
+        <%= form.textfield "number" %>
+      <% end %>
+    </td>
+    <td data-col="colEType" class="form-group">
+      <% form.push(form.set_index("extents[]", 0), begin archival_object["extents"][0] || {} rescue {} end) do %>
+        <%= form.select "extent_type", jsonmodel_definition(:extent).options_for(form, "extent_type", true) %>
+      <% end %>
+    </td>
+    <td data-col="colEContainer" class="form-group">
+      <% form.push(form.set_index("extents[]", 0), begin archival_object["extents"][0] || {} rescue {} end) do %>
+        <%= form.textfield "container_summary" %>
+      <% end %>
+    </td>
+    <td data-col="colEPhysical" class="form-group">
+      <% form.push(form.set_index("extents[]", 0), begin archival_object["extents"][0] || {} rescue {} end) do %>
+        <%= form.textfield "physical_details" %>
+      <% end %>
+    </td>
+    <td data-col="colEDimensions" class="form-group">
+      <% form.push(form.set_index("extents[]", 0), begin archival_object["extents"][0] || {} rescue {} end) do %>
+        <%= form.textfield "dimensions" %>
+      <% end %>
+    </td>
     <td data-col="colIType" class="form-group">
       <% form.push(form.set_index("instances[]", 0), begin archival_object["instances"][0] || {} rescue {} end) do %>
         <%= form.select "instance_type", jsonmodel_definition(:instance).options_for(form, 'instance_type', true).reject{|option_arr| option_arr[1] === 'digital_object'} %>
       <% end %>
     </td>
-    <td data-col="colCType1" class="form-group">
+    <td data-col="colCTop" class="form-group">
       <% form.push(form.set_index("instances[]", 0), begin archival_object["instances"][0] || {} rescue {} end) do %>
-        <% form.push(form.set_index("container", 0), form["container"] || {}) do %>
-          <%= form.select "type_1", jsonmodel_definition(:container).options_for(form, 'type_1', true) %>
+        <% form.push(form.set_index("sub_container", 0), form["sub_container"] || {}) do %>
+          <% form.push("top_container", form.obj["top_container"] || {}) do %>
+            <%= render_aspace_partial :partial => "top_containers/rde_linker", :locals => {:form => form} %>
+          <% end %>
         <% end %>
-        <% form.push(form.set_index("container", 0), []) do %>
+        <% form.push(form.set_index("sub_container", 0), []) do %>
           <span id="<%= form.id_for(nil) %>"></span>
-        <% end %>
-      <% end %>
-    </td>
-    <td data-col="colCInd1" class="form-group">
-      <% form.push(form.set_index("instances[]", 0), begin archival_object["instances"][0] || {} rescue {} end) do %>
-        <% form.push(form.set_index("container", 0), form["container"] || {}) do %>
-          <%= form.textfield "indicator_1" %>
-        <% end %>
-      <% end %>
-    </td>
-    <td data-col="colCBarc1" class="form-group">
-      <% form.push(form.set_index("instances[]", 0), begin archival_object["instances"][0] || {} rescue {} end) do %>
-        <% form.push(form.set_index("container", 0), form["container"] || {}) do %>
-          <%= form.textfield "barcode_1" %>
         <% end %>
       <% end %>
     </td>
     <td data-col="colCType2" class="form-group">
       <% form.push(form.set_index("instances[]", 0), begin archival_object["instances"][0] || {} rescue {} end) do %>
-        <% form.push(form.set_index("container", 0), form["container"] || {}) do %>
-          <%= form.select "type_2", jsonmodel_definition(:container).options_for(form, 'type_2', true) %>
+        <% form.push(form.set_index("sub_container", 0), form["sub_container"] || {}) do %>
+          <%= form.select "type_2", jsonmodel_definition(:sub_container).options_for(form, 'type_2', true) %>
         <% end %>
       <% end %>
     </td>
     <td data-col="colCInd2" class="form-group">
       <% form.push(form.set_index("instances[]", 0), begin archival_object["instances"][0] || {} rescue {} end) do %>
-        <% form.push(form.set_index("container", 0), form["container"] || {}) do %>
+        <% form.push(form.set_index("sub_container", 0), form["sub_container"] || {}) do %>
           <%= form.textfield "indicator_2" %>
         <% end %>
       <% end %>
     </td>
     <td data-col="colCType3" class="form-group">
       <% form.push(form.set_index("instances[]", 0), begin archival_object["instances"][0] || {} rescue {} end) do %>
-        <% form.push(form.set_index("container", 0), form["container"] || {}) do %>
-          <%= form.select "type_3", jsonmodel_definition(:container).options_for(form, 'type_3', true) %>
+        <% form.push(form.set_index("sub_container", 0), form["sub_container"] || {}) do %>
+          <%= form.select "type_3", jsonmodel_definition(:sub_container).options_for(form, 'type_3', true) %>
         <% end %>
       <% end %>
     </td>
     <td data-col="colCInd3" class="form-group">
       <% form.push(form.set_index("instances[]", 0), begin archival_object["instances"][0] || {} rescue {} end) do %>
-        <% form.push(form.set_index("container", 0), form["container"] || {}) do %>
+        <% form.push(form.set_index("sub_container", 0), form["sub_container"] || {}) do %>
           <%= form.textfield "indicator_3" %>
         <% end %>
       <% end %>
@@ -186,8 +224,10 @@
       <% end %>
     </td>
     <td data-col="colNCont1" class="form-group">
+      <% content = begin archival_object["notes"][0]["jsonmodel_type"] == "note_multipart" ? archival_object["notes"][0]["subnotes"][0]['content'] : archival_object["notes"][0]["content"][0] rescue "" end %>
+
       <% form.push(form.set_index("notes[]", 0), begin archival_object["notes"][0] || {} rescue {} end) do %>
-        <% form.push(form.set_index("content[]", 0), begin form["content"][0] || "" rescue "" end) do %>
+        <% form.push(form.set_index("content[]", 0), content) do %>
           <%= form.textfield nil, form.obj %>
         <% end %>
         <% form.push("content", begin archival_object["content"] || [] rescue [] end) do %>
@@ -210,8 +250,10 @@
       <% end %>
     </td>
     <td data-col="colNCont2" class="form-group">
+      <% content = begin archival_object["notes"][1]["jsonmodel_type"] == "note_multipart" ? archival_object["notes"][1]["subnotes"][0]['content'] : archival_object["notes"][1]["content"][0] rescue "" end %>
+
       <% form.push(form.set_index("notes[]", 1), begin archival_object["notes"][1] || {} rescue {} end) do %>
-        <% form.push(form.set_index("content[]", 0), begin form["content"][0] || "" rescue "" end) do %>
+        <% form.push(form.set_index("content[]", 0), begin content || "" rescue "" end) do %>
           <%= form.textfield nil, form.obj %>
         <% end %>
         <% form.push("content", begin archival_object["content"] || [] rescue [] end) do %>
@@ -234,8 +276,10 @@
       <% end %>
     </td>
     <td data-col="colNCont3" class="form-group">
+      <% content = begin archival_object["notes"][2]["jsonmodel_type"] == "note_multipart" ? archival_object["notes"][2]["subnotes"][0]['content'] : archival_object["notes"][2]["content"][0] rescue "" end %>
+
       <% form.push(form.set_index("notes[]", 2), begin archival_object["notes"][2] || {} rescue {} end) do %>
-        <% form.push(form.set_index("content[]", 0), begin form["content"][0] || "" rescue "" end) do %>
+        <% form.push(form.set_index("content[]", 0), begin content || "" rescue "" end) do %>
           <%= form.textfield nil, form.obj %>
         <% end %>
         <% form.push("content", begin archival_object["content"] || [] rescue [] end) do %>

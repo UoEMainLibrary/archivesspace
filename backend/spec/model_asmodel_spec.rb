@@ -3,8 +3,10 @@ require 'spec_helper'
 describe 'ASModel' do
 
   before(:all) do
-    $testdb.create_table(:asmodel_spec) do
-      primary_key :id
+    DB.open(true) do |db|
+      db.create_table(:asmodel_spec) do
+        primary_key :id
+      end
     end
 
     class TestModel < Sequel::Model(:asmodel_spec)
@@ -20,7 +22,7 @@ describe 'ASModel' do
 
     expect {
       TestModel.set_model_scope(:banana)
-    }.to raise_error
+    }.to raise_error(RuntimeError)
   end
 
 

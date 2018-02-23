@@ -11,16 +11,16 @@ Warbler::Config.new do |config|
   config.features = []
 
   # Application directories to be included in the webapp.
-  config.dirs = %w(app config lib log vendor tmp)
+  config.dirs = %w(app config lib log vendor tmp .bundle)
 
   # Additional files/directories to include, above those in config.dirs
   #
   # config.ru is needed here because Rails looks for it when trying to determine
   # its root directory.
-  config.includes = FileList["Gemfile", "config.ru"]
+  config.includes = FileList["Gemfile", "Gemfile.lock", "config.ru"]
 
   # Additional files/directories to exclude
-  # config.excludes = FileList["lib/tasks/*"]
+  config.excludes = FileList[".bundle/install.log"]
 
   # Additional Java .jar files to include.  Note that if .jar files are placed
   # in lib (and not otherwise excluded) then they need not be mentioned here.
@@ -126,7 +126,7 @@ Warbler::Config.new do |config|
   config.webxml.booter = :rails
 
   # Set JRuby to run in 1.9 mode.
-  config.webxml.jruby.compat.version = "1.9"
+  # config.webxml.jruby.compat.version = "1.9"
 
   # When using the :rack booter, "Rackup" script to use.
   # - For 'rackup.path', the value points to the location of the rackup

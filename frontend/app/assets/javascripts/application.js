@@ -11,17 +11,18 @@
 // GO AFTER THE REQUIRES BELOW.
 //
 //= require jquery
-//= require jquery.ui.all
+//= require jquery-ui
 //= require jquery_ujs
 //= require jquery.browser
 //= require twitter/bootstrap
 //= require bootstrap_overrides
 //= require jquery.form
 //= require jquery.scrollto
+//= require jquery.hotkeys
 //= require utils
 //= require header
 //= require linker
 //= require lodash
 //= require bootstrap-select
 //= require bootstrap3-typeahead
-AS.tree_data = {};
+

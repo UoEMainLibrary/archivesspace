@@ -4,13 +4,13 @@ require 'converter_spec_helper'
 require_relative '../app/converters/marcxml_converter'
 
 describe 'MARCXML converter' do
-  let(:my_converter) {
-    MarcXMLConverter
-  }
 
+  def my_converter
+    MarcXMLConverter
+  end
 
   describe "Basic MARCXML to ASPACE mappings" do
-    let (:test_doc_1) {
+    def test_doc_1
       src = <<END
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
       <collection xsi:schemaLocation="http://www.loc.gov/MARC21/slim http://www.loc.gov/standards/marcxml/schema/MARC21slim.xsd" xmlns="http://www.loc.gov/MARC21/slim" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
@@ -68,7 +68,7 @@ describe 'MARCXML converter' do
 END
 
       get_tempfile_path(src)
-    }
+    end
 
 
     before(:all) do
@@ -208,11 +208,11 @@ END
       end
 
       it "maps datafield[@tag='110' or @tag='610' or @tag='710'] to agent_corporate_entity" do
-        @corps.count.should eq(3)
+        @corps.count.should eq(4)
       end
 
       it "maps datafield[@tag='110' or @tag='610' or @tag='710'] to agent_corporate_entity with source 'ingest'" do
-        @corps.select {|f| f['names'][0]['source'] == 'ingest'}.count.should eq(2)
+        @corps.select {|f| f['names'][0]['source'] == 'ingest'}.count.should eq(3)
       end
 
       it "maps datafield[@tag='610']/subfield[@code='2'] to agent_corporate_entity.names[].source" do
@@ -224,9 +224,9 @@ END
         links.select {|l| l['role'] == 'subject'}.count.should eq(1)
       end
 
-      it "maps datafield[@tag='110'][subfield[@code='e']='Creator (cre)'] and datafield[@tag='710'][subfield[@code='e']='source'] to agent_corporate_entity linked as 'creator'" do
+      it "maps datafield[@tag='110'][subfield[@code='e']='Creator (cre)'] and datafield[@tag='710'][subfield[@code='e']='source'] or no $e/$4 to agent_corporate_entity linked as 'creator'" do
         links = @resource['linked_agents'].select {|a| @corps.map{|c| c['uri']}.include?(a['ref'])}
-        links.select {|l| l['role'] == 'creator'}.count.should eq(2)
+        links.select {|l| l['role'] == 'creator'}.count.should eq(3)
       end
 
       it "maps datafield[@tag='610' or @tag='110' or @tag='710']/subfield[@tag='a'] to agent_corporate_entity.names[].primary_name" do
@@ -253,6 +253,14 @@ END
 
       it "maps datafield[@tag='110' or @tag='610' or @tag='710']/subfield[@code='n'] to agent_corporate_entity.names[].number" do
         @corps.select{|p| p['names'][0]['number'] == 'CNames-Number-AT'}.count.should eq(3)
+      end
+
+      it "maps datafield[@tag='110' or @tag='710'] with no $e or $4 to creator agent_corporate_entity" do
+        creator = @corps.select{|c| c['names'][0]['primary_name'] == 'DNames-PrimaryName-AT'}
+        creator.length.should eq(1)
+        link = @resource['linked_agents'].select{|a| a['ref'] == creator[0]['uri']}
+        link.length.should eq(1)
+        link[0]['role'].should eq('creator')
       end
 
       it "maps datafield[@tag='245'] to resource.title using template '$a : $b [$h] $k , $n , $p , $s / $c' " do
@@ -348,16 +356,42 @@ END
       converter = MarcXMLConverter.for_subjects_and_agents_only(john_davis)
       converter.run
       json = JSON(IO.read(converter.get_output_path))
+      # we should only get one agent record
+      json.count.should eq(1)
 
-      new_record = json.last
+      agent = json.first
+      agent['publish'].should be_truthy
 
-      new_record['names'][0]['primary_name'].should eq("Davis")
-      new_record['names'][0]['rest_of_name'].should eq("John W.")
-      new_record['names'][0]['dates'].should eq("1873-1955")
+      agent['dates_of_existence'].count.should eq(1)
+      agent['dates_of_existence'][0]['expression'].should eq('18990101-19611201')
+      agent['dates_of_existence'][0]['begin'].should eq('1899')
+      agent['dates_of_existence'][0]['end'].should eq('1961')
+
+      agent['notes'].count.should eq(1)
+      agent['notes'][0]['subnotes'][0]['content'].should eq(
+        'Biographical or historical data. Expansion ... Uniform Resource Identifier'
+      )
+
+      agent['names'][0]['name_order'].should eq("inverted")
+      agent['names'][0]['authority_id'].should eq('n88218900')
+      agent['names'][0]['authorized'].should be_truthy
+      agent['names'][0]['is_display_name'].should be_truthy
+      agent['names'][0]['source'].should eq('naf')
+      agent['names'][0]['rules'].should eq('aacr')
+      agent['names'][0]['primary_name'].should eq("Davis")
+      agent['names'][0]['rest_of_name'].should eq("John W.")
+      agent['names'][0]['fuller_form'].should eq("John William")
+      agent['names'][0]['dates'].should eq("1873-1955")
 
       # Unauthorized names are added too
-      new_record['names'][1]['primary_name'].should eq("Davis")
-      new_record['names'][1]['rest_of_name'].should eq("John William,")
+      agent['names'][1]['name_order'].should eq("inverted")
+      agent['names'][1]['authority_id'].should be_nil
+      agent['names'][1]['authorized'].should be_falsey
+      agent['names'][1]['source'].should eq('naf')
+      agent['names'][1]['rules'].should eq('aacr')
+      agent['names'][1]['is_display_name'].should be_falsey
+      agent['names'][1]['primary_name'].should eq("Davis")
+      agent['names'][1]['rest_of_name'].should eq("John William")
     end
   end
 
@@ -369,14 +403,30 @@ END
       converter = MarcXMLConverter.for_subjects_and_agents_only(cyberpunk_file)
       converter.run
       json = JSON(IO.read(converter.get_output_path))
+      # we should only get one subject record
+      json.count.should eq(1)
 
-      # ensure we get them in a standard order
-      badass, cyberpunk = json.sort_by { |j| j['terms'][0]['term'] }
-      badass['terms'][0]['term'].should eq("Badass sci-fi")
-      badass['source'].should eq("Library of Congress Subject Headings")
+      subject = json.first
+      subject['publish'].should be_truthy
+      subject['authority_id'].should eq('no2006087900')
+      subject['source'].should eq("Library of Congress Subject Headings")
+      subject['scope_note'].should eq('Works on cyberpunk in the genre Science Fiction. May be combined with geographic name in the form Cyberpunk fiction-Japan.')
+      subject['terms'].count.should eq(1)
+      subject['terms'][0]['term'].should eq('Cyberpunk')
+    end
 
-      cyberpunk['terms'][0]['term'].should eq("Cyberpunk")
-      cyberpunk['source'].should eq("Library of Congress Subject Headings")
+    it "can import a subject authority record with lcgft source" do
+      lcgft_file = File.expand_path("../app/exporters/examples/marc/gf2014026450.xml",
+                                    File.dirname(__FILE__))
+
+      converter = MarcXMLConverter.for_subjects_and_agents_only(lcgft_file)
+      converter.run
+      json = JSON(IO.read(converter.get_output_path))
+      # we should only get one subject record
+      json.count.should eq(1)
+
+      subject = json.first
+      subject['source'].should eq("lcgft")
     end
   end
 
@@ -415,7 +465,7 @@ marc
 
 
   describe "Name Order handling" do
-    let(:name_order_test_doc) {
+    def name_order_test_doc
       src = <<ROTFL
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <collection xsi:schemaLocation="http://www.loc.gov/MARC21/slim http://www.loc.gov/standards/marcxml/schema/MARC21slim.xsd" xmlns="http://www.loc.gov/MARC21/slim" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
@@ -476,7 +526,7 @@ marc
 ROTFL
 
       get_tempfile_path(src)
-    }
+    end
 
     before(:all) do
       converter = MarcXMLConverter.for_subjects_and_agents_only(name_order_test_doc)
@@ -534,7 +584,7 @@ OMFG
       get_tempfile_path(src)
     }
 
-    before(:all) do
+    before(:each) do
       json = convert(date_dupes_test_doc)
       @resource = json.last
     end

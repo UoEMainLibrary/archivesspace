@@ -1,8 +1,14 @@
+# Note: ASUtils gets pulled in all over the place, and in some places prior to
+# any gems having been loaded.  Be careful about loading gems here, as the gem
+# path might not yet be configured.  For example, loading the 'json' gem can
+# cause you to pull in the version that ships with JRuby, rather than the one in
+# your Gemfile.
+
 require 'java'
-require 'json'
 require 'tmpdir'
 require 'tempfile'
 require 'config/config-distribution'
+require 'asconstants'
 
 module ASUtils
 
@@ -79,18 +85,31 @@ module ASUtils
 
 
   def self.find_base_directory(root = nil)
-    [java.lang.System.get_property("ASPACE_LAUNCHER_BASE"),
+    # JRuby 9K seems to be adding this strange suffix...
+    #
+    # Example: /pat/to/archivesspace/backend/uri:classloader:
+    this_dir = __dir__.gsub(/uri:classloader:\z/, '')
+
+    res = [java.lang.System.get_property("ASPACE_LAUNCHER_BASE"),
      java.lang.System.get_property("catalina.base"),
-     File.join(*[File.dirname(__FILE__), "..", root].compact)].find {|dir|
-      Dir.exists?(dir)
+     File.join(*[this_dir, "..", root].compact)].find {|dir|
+      dir && Dir.exist?(dir)
     }
+
+    res
   end
 
 
   def self.find_local_directories(base = nil, *plugins)
     plugins = AppConfig[:plugins] if plugins.empty?
-    base_directory = self.find_base_directory
-    Array(plugins).map { |plugin| File.join(*[base_directory, "plugins", plugin, base].compact) }
+    # if a specific plugins directory is set in config.rb,
+    # we use that. Otherwise, find the 'plugins' dir in the 
+    # aspace base.
+    base_directory =
+      AppConfig.changed?(:plugins_directory) ?
+        AppConfig[:plugins_directory] :
+        File.join( *[ self.find_base_directory, 'plugins'])
+    Array(plugins).map { |plugin| File.join(*[base_directory, plugin, base].compact) }
   end
 
 
@@ -112,10 +131,7 @@ module ASUtils
  def self.get_diagnostics(exception = nil )
     runtime = java.lang.Runtime.getRuntime
    {
-      :version =>ASConstants.VERSION,  
-      :environment => java.lang.System.getenv.to_hash,
-      :jvm_properties => java.lang.System.getProperties.to_hash,
-      :globals => Hash[global_variables.map {|v| [v, eval(v.to_s)]}],
+      :version =>ASConstants.VERSION,
       :appconfig => defined?(AppConfig) ? AppConfig.dump_sanitized : "not loaded",
       :memory => {
         :free => runtime.freeMemory,
@@ -129,8 +145,13 @@ module ASUtils
  end
 
   def self.dump_diagnostics(exception = nil)
+    unless defined?(JSON)
+      # We might get invoked before everything has been loaded, so just load a minimal set.
+      require 'json'
+    end
+
     diagnostics = self.get_diagnostics( exception ) 
-    tmp = File.join(Dir.tmpdir, "aspaue_diagnostic_#{Time.now.to_i}.txt")
+    tmp = File.join(Dir.tmpdir, "aspace_diagnostic_#{Time.now.to_i}.txt")
     File.open(tmp, "w") do |fh|
       fh.write(JSON.pretty_generate(diagnostics))
     end
@@ -165,11 +186,69 @@ EOF
     target
   end
 
+  # Recursively concatenates hash2 onto hash 1
+  def self.deep_merge_concat(hash1, hash2)
+    target = hash1.dup
+    hash2.keys.each do |key|
+      if hash2[key].is_a? Hash and hash1[key].is_a? Hash
+        target[key] = self.deep_merge_concat(target[key], hash2[key])
+        next
+      end
+      if hash2[key].is_a? Array and hash1[key].is_a? Array
+        
+        if hash1[key] === []
+          target[key] = hash2[key]
+        elsif hash2[key] === []
+          target[key] = target[key]
+        else
+          target_array = []
+          target[key].zip(hash2[key]).each do |target_a, hash2_a|
+            if target_a.nil?
+              target_array << hash2_a
+            elsif hash2_a.nil?
+              target_array << target_a
+            else  
+              target_array << self.deep_merge_concat(target_a, hash2_a)
+            end
+          end
+          target[key] = target_array
+        end
+        next
+      end
+      if hash1[key] === true and key != "is_display_name" and key != "authorized"
+        hash1[key] = "true"
+      elsif hash1[key] === false and key != "is_display_name" and key != "authorized"
+        hash1[key] = "false"        
+      end
+      if hash2[key] === true and key != "is_display_name" and key != "authorized"
+        hash2[key] = "1"
+      elsif hash2[key] === false and key != "is_display_name" and key != "authorized"
+        hash2[key] = "0"        
+      end
+      if hash1[key].is_a? String
+        if hash1[key] == hash2[key]
+          target[key] = hash2[key]
+        else
+          if key == "jsonmodel_type" and hash1[key].include?("note") and hash2[key].include?("note")
+            raise "Required Note Types must not conflict with Default Note Types"
+          elsif key == "jsonmodel_type" and hash1[key].include?("relationship") and hash2[key].include?("relationship")
+            raise "Required Relationship Types must not conflict with Default Relationship Types"
+          else
+            target[key] = hash1[key] + '_' + hash2[key]
+          end
+        end
+      else
+        target[key] = hash2[key]
+      end
+    end
+    target
+  end
+
 
   def self.load_plugin_gems(context)
     ASUtils.find_local_directories.each do |plugin|
       gemfile = File.join(plugin, 'Gemfile')
-      if File.exists?(gemfile)
+      if File.exist?(gemfile)
         context.instance_eval(File.read(gemfile))
       end
     end
@@ -187,15 +266,66 @@ EOF
     end
   end
 
-  # find a nested key inside a hash
-  def self.search_nested(hash,key)
-    if hash.respond_to?(:key?) && hash.key?(key)
-      hash[key]
-    elsif hash.respond_to?(:each)
-      obj = nil
-      hash.find{ |*a| obj=self.search_nested(a.last,key) }
-      obj 
+  # Recursively find any hash entry whose key is in `keys`.  When we find a
+  # match, call `block` with the key and value as arguments.
+  #
+  # Skips descending into any hash entry whose key is in `ignore_keys` (allowing
+  # us to avoid walking '_resolved' subtrees, for example)
+  def self.search_nested(elt, keys, ignore_keys = [], &block)
+    if elt.respond_to?(:key?)
+      keys.each do |key|
+        if elt.key?(key)
+          block.call(key, elt.fetch(key))
+        end
+      end
+
+      elt.each.each do |next_key, value|
+        unless ignore_keys.include?(next_key)
+          search_nested(value, keys, ignore_keys, &block)
+        end
+      end
+    elsif elt.respond_to?(:each)
+      elt.each do |value|
+        search_nested(value, keys, ignore_keys, &block)
+      end
     end
+  end
+
+  # recursively walk `obj` and remove any hash entry whose key returns `true`
+  # for `block.call(key)`.
+  #
+  # `obj` can be an arbitrarily nested combination of array-like and hash-like
+  # things.
+  def self.recursive_reject_key(obj, &block)
+    if obj.nil? || block.nil?
+      obj
+    elsif obj.respond_to?(:each_pair)
+      result = {}
+      obj.each_pair do |k, v|
+	if !block.call(k)
+	  result[k] = recursive_reject_key(v, &block)
+	end
+      end
+      result
+    elsif obj.respond_to?(:map)
+      obj.map { |elt| recursive_reject_key(elt, &block) }
+    else
+      obj
+    end
+  end
+
+  def self.blank?(obj)
+    if obj.nil?
+      true
+    elsif obj.respond_to?(:empty?)
+      !!obj.empty?
+    else
+      !obj
+    end
+  end
+
+  def self.present?(obj)
+    !blank?(obj)
   end
 
 end

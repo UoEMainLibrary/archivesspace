@@ -19,19 +19,14 @@ class ArchivesSpaceService < Sinatra::Base
   do
     [200, {}, Log.backlog ]
   end
-
-  Endpoint.get('/system/resequence')
-  .description("Get the log information and start the 15 second log recorder") 
+  
+  Endpoint.get('/system/events')
+  .description("Get the systems events that have been logged for this install") 
   .permissions([:administer_system])
-  .params( ["types", [String], "Array of Object trypes to resequence", :optional => true] )
   .returns([200, "String"],
            [403, "Access Denied"]) \
   do
-    klasses = %W{ ArchivalObject DigitalObjectComponent ClassificationTerm   } & params[:type] 
-    klasses.collect! { |k| Kernel.const_get(k.to_sym) } 
-    Resequencer.run(klasses)
-
-    [200, {}, Resequencer.status.to_s ]
+    [200, {}, SystemEvent.all.collect { |a| a.values }.to_json  ]
   end
 
   Endpoint.post('/system/demo_db_snapshot')
@@ -40,7 +35,7 @@ class ArchivesSpaceService < Sinatra::Base
   .returns([200, "OK"]) \
   do
     flag = AppConfig[:demodb_snapshot_flag]
-    if File.exists?(flag)
+    if File.exist?(flag)
       Log.info("Starting backup of embedded demo database")
       DB.demo_db_backup
       Log.info("Backup of embedded demo database completed!")

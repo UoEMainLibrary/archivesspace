@@ -162,15 +162,6 @@ module ASModel
 
           # Tell the nested record to clear its own nested records
           Array(self.send(nested_record_defn[:association][:name])).each do |nested_record|
-
-            # not stoked on this ,but some one_to_one's (collection_management
-            # ) get indexed with an id that refs the parent. so we need to
-            # tombstone the uri that points back to the parent uri
-            if nested_record_defn[:association][:type] == :one_to_one
-              context_uri =  "#{self.uri}##{self.class.to_s.downcase}_#{nested_record.class.to_s.underscore}"
-              Tombstone.create(:uri => context_uri)
-            end
-            
             nested_record.delete
           end
         elsif nested_record_defn[:association][:type] === :many_to_many
@@ -270,6 +261,11 @@ module ASModel
         break if object_graph.models.length == successfully_deleted_models.length
 
         unless progressed
+          if last_error && DB.is_retriable_exception(last_error)
+            # Give us a chance to retry after a deadlock
+            raise last_error
+          end
+
           raise ConflictException.new("Record deletion failed: #{last_error}")
         end
       end
@@ -358,7 +354,12 @@ module ASModel
       def fire_update(json, sequel_obj)
         if high_priority?
           model = self
+
           uri = sequel_obj.uri
+
+          # We don't index records without URIs, so no point digging them out of the database either.
+          return unless uri
+
           hash = model.to_jsonmodel(sequel_obj.id).to_hash(:trusted)
           DB.after_commit do
             RealtimeIndexing.record_update(hash, uri)
@@ -407,7 +408,29 @@ module ASModel
 
         opts[:is_array] = true if !opts.has_key?(:is_array)
 
+        # Store our association on the nested record's model so we can walk back
+        # the other way.
+        ArchivesSpaceService.loaded_hook do
+          nested_model = Kernel.const_get(opts[:association][:class_name])
+          nested_model.add_enclosing_association(opts[:association])
+        end
+
         nested_records << opts
+      end
+
+
+      # Record the association of the record that encloses this one.  For
+      # example, an Archival Object encloses an Instance record because an
+      # Instance is a nested record of an Archival Object.
+      def add_enclosing_association(association)
+        @enclosing_associations ||= []
+        @enclosing_associations << association
+      end
+
+      # If this is a nested record, return the list of associations that link us
+      # back to our parent(s).  Top-level records just return an empty list.
+      def enclosing_associations
+        @enclosing_associations || []
       end
 
 
@@ -464,6 +487,12 @@ module ASModel
         NestedRecordResolver.new(nested_records, objs).resolve
       end
 
+      def associations_to_eagerly_load
+        # Allow subclasses to force eager loading of certain associations to
+        # save SQL queries.
+        []
+      end
+
 
       def to_jsonmodel(obj, opts = {})
         if obj.is_a? Integer
@@ -486,6 +515,13 @@ module ASModel
 
       def handle_delete(ids_to_delete)
         self.filter(:id => ids_to_delete).delete
+      end
+
+
+      def update_mtime_for_repo_id(repo_id)
+        if model_scope == :repository
+          self.dataset.filter(:repo_id => repo_id).update(:system_mtime => Time.now)
+        end
       end
 
 

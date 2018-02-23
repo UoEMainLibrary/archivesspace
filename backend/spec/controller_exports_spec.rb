@@ -2,6 +2,14 @@ require 'spec_helper'
 
 describe 'Exports controller' do
 
+  before(:each) do
+    # EAD export normally tries the search index first, but for the tests we'll
+    # skip that since Solr isn't running.
+    allow(Search).to receive(:records_for_uris) do |*|
+      {'results' => []}
+    end
+  end
+
   it "lets you export an Agent as EAC, even when it is linked to records from another repo" do
 
     accession = create(:json_accession)
@@ -72,13 +80,12 @@ describe 'Exports controller' do
 
     aos = []
     ["earth", "australia", "canberra"].each do |name|
-      ao = create(:json_archival_object, {:title => "archival object: #{name}"})
+      ao = create(:json_archival_object, {:title => "archival object: #{name}",
+                                          :resource => {:ref => resource.uri}})
       if not aos.empty?
         ao.parent = {:ref => aos.last.uri}
         ao.publish = false
       end
-
-      ao.resource = {:ref => resource.uri}
 
       ao.save
       aos << ao
@@ -97,13 +104,13 @@ describe 'Exports controller' do
 
     aos = []
     ["earth", "australia", "canberra"].each do |name|
-      ao = create(:json_archival_object, {:title => "archival object: #{name}"})
+      ao = create(:json_archival_object, {:title => "archival object: #{name}",
+                                          :resource => {:ref => resource.uri}})
+
       if not aos.empty?
         ao.parent = {:ref => aos.last.uri}
         ao.publish = false
       end
-
-      ao.resource = {:ref => resource.uri}
 
       ao.save
       aos << ao
@@ -125,11 +132,60 @@ describe 'Exports controller' do
 
 
   it "lets you export labels for a resource as tab separated values" do
-    id = create(:json_resource).id
+    resource= create(:json_resource)
+
+    # create the record with all the instance/container etc
+    location = create(:json_location, :temporary => generate(:temporary_location_type))
+    status = 'current'
+    
+    container_profile = create(:json_container_profile)
+
+    top_container = create(:json_top_container,
+                           :container_profile => {'ref' => container_profile.uri},
+                           :container_locations => [{'ref' => location.uri,
+                                                      'status' => status,
+                                                      'start_date' => generate(:yyyy_mm_dd),
+                                                      'end_date' => generate(:yyyy_mm_dd)}])
+
+    archival_object = create(:json_archival_object,
+                             :resource => { :ref => resource.uri }, 
+                             :instances => [build(:json_instance,
+                                                  :sub_container => build(:json_sub_container,
+                                                                          :top_container => {:ref => top_container.uri}))]
+                             )
+
+    id = resource.id 
     get "/repositories/#{$repo_id}/resource_labels/#{id}.tsv"
     resp = last_response.body
-    resp.should match(/Repository Name\t/)
+  
+    # it should have the headers...
+    headers = %w(
+      Repository\ Name Resource\ Title  Resource\ Identifier Series\ Archival\ Object\ Title
+      Archival\ Object\ Title Container\ Profile Top\ Container Top\ Container\ Barcode
+      SubContainer\ 1 SubContainer\ 2 Current\ Location 
+    ).join('\t')
+    resp.should match(headers)
+
+    # it should have our location
+    resp.should match( Regexp.escape( location.title ))
+
+
+    # it should have all our tc info
+    resp.should match(Regexp.escape( container_profile.name ))
+    resp.should match(Regexp.escape( top_container.indicator ))
+    resp.should match(Regexp.escape( top_container.type ))
+  
+    # it should have our top container info
+    sub = archival_object.instances.first["sub_container"]
+    
+    resp.should match( Regexp.escape( sub["type_2"] ))
+    resp.should match( Regexp.escape( sub["type_3"] )) 
+    
+    resp.should match( Regexp.escape( sub["indicator_2"] ))
+    resp.should match( Regexp.escape( sub["indicator_3"] ))
+
   end
+
 
 
   it "lets you export a digital object in MODS" do
@@ -153,6 +209,39 @@ describe 'Exports controller' do
     get "/repositories/#{$repo_id}/digital_objects/dublin_core/#{dig.id}.xml"
     resp = last_response.body
     resp.should match(/<title>#{dig.title}<\/title>/)
+  end
+
+
+  it "gives you metadata for any kind of export" do
+    # agent exports
+    agent = create(:json_agent_person).id
+    check_metadata("archival_contexts/people/#{agent}.xml")
+    agent = create(:json_agent_family).id
+    check_metadata("archival_contexts/families/#{agent}.xml")
+    agent = create(:json_agent_corporate_entity).id
+    check_metadata("archival_contexts/corporate_entities/#{agent}.xml")
+    agent = create(:json_agent_software).id
+    check_metadata("archival_contexts/softwares/#{agent}.xml")
+
+    # resource exports
+    res = create(:json_resource, :publish => true).id
+    check_metadata("resource_descriptions/#{res}.xml")
+    check_metadata("resources/marc21/#{res}.xml")
+    check_metadata("resource_labels/#{res}.tsv")
+
+    # digital object exports
+    dig = create(:json_digital_object).id
+    check_metadata("digital_objects/mods/#{dig}.xml")
+    check_metadata("digital_objects/mets/#{dig}.xml")
+    check_metadata("digital_objects/dublin_core/#{dig}.xml")
+  end
+
+
+  def check_metadata(export_uri)
+    get "/repositories/#{$repo_id}/#{export_uri}/metadata"
+    resp = ASUtils.json_parse(last_response.body)
+    resp.has_key?('mimetype').should be true
+    resp.has_key?('filename').should be true
   end
 
 end

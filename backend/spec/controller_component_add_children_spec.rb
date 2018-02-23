@@ -83,7 +83,7 @@ describe 'Component Add Children controllers' do
     the_move = JSONModel::HTTP::post_form("#{ao.uri}/accept_children", {"children[]" => movers, "position" => 20})
     the_move.should be_ok 
 
-    new_order = children.slice(0..18) + movers + children.drop(19)
+    new_order = children.slice(0..19) + movers + children.drop(20)
     
     # let's check out tree again 
     tree = get_ao_tree(ao.id) 
@@ -93,6 +93,22 @@ describe 'Component Add Children controllers' do
       child["uri"].should eq(new_order[i])
     end
 
+  end
+
+
+  it "won't let you be your own grandparent" do
+    parent = create(:json_archival_object, :resource => {:ref => resource.uri})
+    child = create(:json_archival_object,
+                   :resource => {:ref => resource.uri},
+                   :parent => {:ref => parent.uri})
+    grandchild = create(:json_archival_object,
+                        :resource => {:ref => resource.uri},
+                        :parent => {:ref => child.uri})
+
+
+    response = JSONModel::HTTP::post_form("#{grandchild.uri}/accept_children", {"children[]" => [parent.uri], "position" => 0})
+
+    response.status.should eq(409)
   end
 
 

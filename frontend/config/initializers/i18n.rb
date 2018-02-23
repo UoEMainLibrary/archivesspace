@@ -1,3 +1,6 @@
+require 'aspace_i18n_enumeration_support'
+require 'mixed_content_parser'
+
 module I18n
 
   # Override the I18n string pattern to take into account
@@ -31,39 +34,36 @@ module I18n
   end
 
 
-  def self.t(*args)
-    results =  self.t_raw(*args)
-    results.nil? ? "" : results.html_safe
-  end
+  def self.t(input, options = {})
+    # If a default was provided, we don't want to mark it as html safe.  Let the
+    # lookup fail, then return the (possibly unsafe) default if needed.
+    default = nil
 
-  def self.t_raw(*args)
-    key = args[0]
-    default = if args[1].is_a?(String)
-                args[1]
-              else
-                (args[1] || {}).fetch(:default, "")
-              end
-
-    # String
-    if key && key.kind_of?(String) && key.end_with?(".")
-      return default
+    if options.is_a?(String)
+      # Sometimes people pass a second argument where they wanted a default.
+      # We'll allow this for now.
+      options = {:default => options}
     end
 
-    # Hash / Enumeration Value
-    if key && key.kind_of?(Hash) && key.has_key?(:enumeration)
-      backend  = config.backend
-      locale   = config.locale
-      # Null character to cope with enumeration values containing dots.  Eugh.
-      translation =  backend.send(:lookup, locale, ['enumerations', key[:enumeration], key[:value]].join("\0"), [], {:separator => "\0"}) || default
-      
-      unless translation.blank?
-        return translation
+    if options.is_a?(Hash)
+      default = options.delete(:default)
+    else
+      options = {}
+    end
+
+    begin
+      results =  self.t_raw(input, options.merge(:raise => true))
+      results.nil? ? "" : results.html_safe
+    rescue I18n::MissingTranslationData => e
+      if default
+        default
+      else
+        # "translation missing: ..."
+        e.to_s
       end
     end
-
-
-    self.translate(*args)
   end
+
 end
 
 I18n.exception_handler = :try_really_hard_to_find_a_key
@@ -75,7 +75,15 @@ class JSONModelI18nWrapper < Hash
 
   def initialize(mappings)
     @mappings = mappings
+    @parse_mixed_content = false
     super()
+  end
+
+  def enable_parse_mixed_content!(path = '/')
+    @parse_mixed_content = true
+    @parse_mixed_content_path = path
+
+    self
   end
 
   def [](key)
@@ -83,7 +91,13 @@ class JSONModelI18nWrapper < Hash
 
     (object, property) = key.to_s.split(".", 2)
 
-    CGI::escapeHTML(@mappings[object.intern][property])
+    value = @mappings[object.intern][property]
+
+    if parse_mixed_content?
+      clean_mixed_content(value)
+    else
+      CGI::escapeHTML(value)
+    end
   end
 
   def key?(key)
@@ -96,6 +110,19 @@ class JSONModelI18nWrapper < Hash
 
   def empty?
     @mappings.empty?
+  end
+
+  private
+
+  def parse_mixed_content?
+    @parse_mixed_content
+  end
+
+  def clean_mixed_content(content)
+    content = content.to_s
+    return content if content.blank?
+
+    MixedContentParser::parse(content, @parse_mixed_content_path, { :wrap_blocks => false } ).to_s.html_safe
   end
 
 end

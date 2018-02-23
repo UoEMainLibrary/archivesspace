@@ -1,58 +1,56 @@
-source 'http://rubygems.org'
+source 'https://rubygems.org'
 
-gem 'rails', '3.2.19'
+gem 'rails', '5.0.1'
+gem "activesupport", "5.0.1"
+gem 'loofah', '2.0.3'
+gem 'i18n', '0.7.0'
+
+gem 'sprockets-rails', '2.3.3'
+
+gem 'tzinfo-data'
+
 
 # Bundle edge Rails instead:
 # gem 'rails', :git => 'git://github.com/rails/rails.git'
 
-gem 'activerecord-jdbcsqlite3-adapter'
-
 # Gems used only for assets and not required
 # in production environments by default.
-group :assets do
-  gem 'sass-rails',   '~> 3.2.3'
-  gem 'coffee-rails', '~> 3.2.1'
+gem 'sass-rails', '5.0.5'
+gem 'coffee-rails', '4.2.1'
+gem 'coffee-script'
+gem 'coffee-script-source'
+gem 'uglifier', '3.0.4'
+gem 'therubyrhino'
 
-  gem 'uglifier', '>= 1.0.3'
-  gem 'therubyrhino'
+gem 'less-rails-bootstrap'
 
-  gem 'less-rails', '~> 2.6.0'
-end
-
-gem 'jquery-rails', '~> 3.1.0'
-gem 'jquery-ui-rails', '~> 4.2.1'
-gem "json", "1.8.0"
+gem 'jquery-rails'
+gem 'jquery-ui-rails'
+gem "json", "1.8.6"
 gem 'json-schema', '1.0.10'
 
-gem 'useragent'
-
-gem "jruby-jars", "= 1.7.18"
-
-gem 'warbler', "1.4.2"
-
-
+gem "jruby-jars", "= 9.1.8.0"
 gem 'atomic', '= 1.0.1'
 
 
 group :test do
-  gem 'rspec', '2.12.0'
-  gem 'rspec-core', '2.12.1'
-  gem 'rspec-rails', '2.12.1'
+  gem 'rspec', "~> 3.6.0"
+  gem 'rspec-rails'
   gem 'simplecov', "0.7.1"
 end
 
-gem "puma", "2.8.2"
+gem "mizuno", "0.6.11"
 
 gem "net-http-persistent", "2.8"
 gem "multipart-post", "1.2.0"
 
-gem "rubyzip", "1.0.0"
+gem "rubyzip", "~> 1.2.1" # because of https://github.com/rubyzip/rubyzip/issues/315
 gem "zip-zip", "0.3"
 
-gem "nokogiri", '~> 1.6.1'
+gem 'nokogiri', '1.8.1' # because of https://github.com/sparklemotion/nokogiri/issues/1673
 
+
+require 'asutils'
 
 # Allow plugins to provide their own Gemfiles too.
-#
-require 'asutils'
 ASUtils.load_plugin_gems(self)

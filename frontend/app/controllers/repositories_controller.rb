@@ -1,11 +1,11 @@
 class RepositoriesController < ApplicationController
 
-  set_access_control  "view_repository" => [:select, :index, :show],
+  set_access_control  "view_repository" => [:select, :index, :show, :typeahead],
                       "manage_repository" => [:new, :create, :edit, :update],
                       "transfer_repository" => [:transfer, :run_transfer],
                       "delete_repository" => [:delete]
 
-  before_filter :refresh_repo_list, :only => [:show, :new]
+  before_action :refresh_repo_list, :only => [:show, :new]
 
 
   def index
@@ -127,6 +127,11 @@ class RepositoriesController < ApplicationController
       return transfer
     end
 
+  end
+
+
+  def typeahead
+    render :json => Search.global(params_for_backend_search, "repositories")
   end
 
 

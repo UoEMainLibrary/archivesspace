@@ -9,6 +9,15 @@ require 'net/http'
 require 'json'
 require 'ostruct'
 
+RSpec.configure do |config|
+
+  config.expect_with(:rspec) do |c|
+    c.syntax = [:should, :expect]
+  end
+end
+
+
+
 describe JSONModel do
 
   before(:all) do
@@ -41,7 +50,8 @@ describe JSONModel do
 
   before(:each) do
 
-    JSONModel::Client::EnumSource.stub(:fetch_enumerations) do {} end
+    allow(JSONModel::Client::EnumSource).to receive(:fetch_enumerations).and_return({})
+
 
     schema = '{
       :schema => {
@@ -92,26 +102,19 @@ describe JSONModel do
     }'
 
 
+    AppConfig[:plugins] = []
+
+    allow(JSONModel).to receive(:schema_src).and_return(schema)
+    allow(JSONModel).to receive(:schema_src).with("stub").and_return(schema)
+    allow(JSONModel).to receive(:schema_src).with("child_stub").and_return(child_schema)
+
+    allow(Net::HTTP::Persistent).to receive(:new).and_return( StubHTTP.new )
+
     JSONModel::init(:client_mode => true,
                     :url => "http://example.com",
                     :strict_mode => true,
                     :allow_other_unmapped => true)
 
-    AppConfig[:plugins] = []
-
-    # main schema
-    Dir.stub(:glob){ ['stub', 'child_stub'] }
-
-
-    File.stub(:open).with(/stub\.rb/) { StringIO.new(schema) }
-    File.stub(:open).with(/child_stub\.rb/) { StringIO.new(child_schema) }
-    File.stub(:exists?).with(/stub\.rb/) { true }
-
-
-
-    Net::HTTP::Persistent.stub(:new) do
-      StubHTTP.new
-    end
 
     @klass = Klass.new
   end
@@ -138,7 +141,7 @@ describe JSONModel do
   it "should be able to save an instance of a model" do
     jo = @klass.JSONModel(:stub).from_hash({:ref_id => "abc", :title => "Stub Object"})
     jo.save("repo_id" => 2)
-    jo.to_hash.has_key?('uri').should be_true
+    jo.to_hash.has_key?('uri').should be_truthy
   end
 
   it "should create an instance when given a hash using symbols for keys" do
@@ -158,9 +161,9 @@ describe JSONModel do
     @klass.JSONModel(:child_stub).to_s.should eq('JSONModel(:child_stub)')
     child_jo = @klass.JSONModel(:child_stub).from_hash({:title => "hello", :ref_id => "abc", :childproperty => "yeah", :ignoredproperty => "oh no"})
     child_jo.save("repo_id" => 2)
-    child_jo.to_hash.has_key?('childproperty').should be_true
-    child_jo.to_hash.has_key?('uri').should be_true
-    child_jo.to_hash.has_key?('ignoredproperty').should be_false
+    child_jo.to_hash.has_key?('childproperty').should be_truthy
+    child_jo.to_hash.has_key?('uri').should be_truthy
+    child_jo.to_hash.has_key?('ignoredproperty').should be_falsey
   end
 
   it "can query its schema for the types of things" do

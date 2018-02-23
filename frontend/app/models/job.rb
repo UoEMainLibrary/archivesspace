@@ -1,13 +1,14 @@
 class Job
 
-  def initialize(job_type, job_data, files_to_import)
+  def initialize(job_type, job_data, files_to_import, job_params = {})
 
     if job_type == 'import_job'
       job_data[:filenames] = files_to_import.keys
     end
 
     @job = JSONModel(:job).from_hash(:job_type => job_type,
-                                     :job => job_data)
+                                     :job => job_data,
+                                     :job_params =>  ASUtils.to_json(job_params) )
 
     @files = files_to_import
   end
@@ -38,12 +39,12 @@ class Job
 
 
   def self.active
-    JSONModel::HTTP::get_json(JSONModel(:job).uri_for("active"), "resolve[]" => "repository")
+    JSONModel::HTTP::get_json(JSONModel(:job).uri_for("active"), "resolve[]" => "repository") || {'results' => []}
   end
 
 
   def self.archived(page)
-    JSONModel::HTTP::get_json(JSONModel(:job).uri_for("archived"), :page => page, "resolve[]" => "repository")
+    JSONModel::HTTP::get_json(JSONModel(:job).uri_for("archived"), :page => page, "resolve[]" => "repository") || {'results' => []}
   end
 
 
